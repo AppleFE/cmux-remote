@@ -62,47 +62,47 @@ cmux,terminal,ssh,tmux,tailscale,mac,remote,developer,claude,codex,wireguard,rel
 ### Description (max 4000)
 
 ```
-Cmux Remote turns your iPhone into a remote head for the cmux terminal multiplexer running on your own Mac. Connect over your Tailscale network — your traffic never touches a third-party server.
+Cmux Remote is a private remote-control client for the cmux terminal multiplexer running on your own computer. Connect over your Tailscale network — your traffic never touches a third-party server.
 
 WHAT IT IS
 
-Cmux (https://cmux.com) is a modern terminal multiplexer for macOS with native splits, workspaces, and rich integrations for AI agents like Claude Code, Codex, and Cursor. Cmux Remote mirrors the cmux surface you choose, lets you type into it, send keys, and receive notifications — all from your iPhone.
+Cmux (https://cmux.com) is a modern terminal multiplexer with native splits, workspaces, and rich integrations for AI agents like Claude Code, Codex, omx, and Cursor. Cmux Remote mirrors the cmux surface you choose, lets you type into it, send keys, and receive notifications — all from this mobile app.
 
 WHO IT IS FOR
 
-- Developers who run long-lived agents (claude-code, codex, omx) on their Mac and want to peek in or nudge them from the couch
-- People who SSH into their own Mac dev box from cafés today and want a less awkward experience
+- Developers who run long-lived agents (claude-code, codex, omx) and want to peek in or nudge them from the couch
+- People who SSH into their own development machine from cafés today and want a less awkward experience
 - Anyone already using Tailscale and looking for a private way to reach their terminal
 
 HOW IT WORKS
 
-1. Install the open-source `cmux-relay` binary on your Mac (one-line installer).
-2. Make sure your Mac is on Tailscale.
-3. Open this app, type your Mac's Tailscale hostname, and tap Connect.
+1. Install the open-source `cmux-relay` binary on the computer that runs cmux (one-line installer).
+2. Make sure that computer is connected to Tailscale.
+3. Open this app, type the computer's Tailscale hostname, and tap Connect.
 4. Your cmux workspaces appear. Pick a surface and you are in.
 
-The relay speaks directly to cmux's local Unix socket. The iPhone speaks to the relay over a WireGuard-encrypted Tailscale tunnel. Nothing leaves your network.
+The relay speaks directly to cmux's local Unix socket. This app speaks to the relay over a WireGuard-encrypted Tailscale tunnel. Nothing leaves your network.
 
 FEATURES
 
 - Live mirror of cmux terminal surfaces with ANSI color and Korean / CJK width support
 - Full keyboard accessory bar — Esc, Enter, Tab, arrows, Ctrl combos
 - Mouse passthrough toggle (xterm SGR) for Textual / Bubble Tea / fzf TUIs
-- Local push for cmux notifications (no remote APNs needed in v1.0)
+- Local notifications for cmux events, with no external notification server required in v1.0
 - Multiple workspaces and surfaces with chip-bar switching
 - Pinch-to-zoom font, scroll-to-bottom on surface change
 - Demo Mode with fully populated fake data — try the app before you set up a relay
 
 PRIVACY
 
-No analytics. No advertising. No third-party SDKs. The bearer token your relay issues is stored only in your iOS Keychain. Read the full policy and source code at:
+No analytics. No advertising. No third-party SDKs. The bearer token your relay issues is stored only in the system's secure credential storage on your device. Read the full policy and source code at:
 
 https://github.com/NewTurn2017/cmux-remote
 
 REQUIREMENTS
 
-- macOS Mac running cmux 0.64 or later
-- Both Mac and iPhone signed in to the same Tailscale tailnet
+- A personal computer running cmux 0.64 or later and cmux-relay
+- Both devices signed in to the same Tailscale tailnet
 - iOS 17 or later
 
 This app is open source under the MIT license. Issues and pull requests welcome.
