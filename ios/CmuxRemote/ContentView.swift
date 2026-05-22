@@ -16,7 +16,10 @@ struct ContentView: View {
         Group {
             switch selectedTab {
             case .workspaces:
-                WorkspaceListView(store: workspaceStore) { _ in selectedTab = .active }
+                WorkspaceListView(store: workspaceStore, notifStore: notifStore) { workspace in
+                    notifStore.markWorkspaceSeen(workspace.id)
+                    selectedTab = .active
+                }
             case .active:
                 WorkspaceView(
                     workspaceStore: workspaceStore,
@@ -55,6 +58,7 @@ struct ContentView: View {
         if workspaceStore.workspaces.contains(where: { $0.id == notification.workspaceId }) {
             workspaceStore.selectedId = notification.workspaceId
             requestedSurfaceId = notification.surfaceId
+            notifStore.markWorkspaceSeen(notification.workspaceId)
         } else {
             requestedSurfaceId = nil
         }
