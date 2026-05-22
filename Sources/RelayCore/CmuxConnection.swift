@@ -20,8 +20,8 @@ public final class CmuxConnection: @unchecked Sendable {
     private let logger = Logger(label: "CmuxConnection")
     private let socketPassword: String?
     private var lastBootId: String?
-    private var dispatchClient: CMUXClient?
-    private var eventsClient: CMUXClient?
+    private let dispatchResource: ReconnectingResource<CMUXClient>
+    private let eventsResource: ReconnectingResource<CMUXClient>
 
     public init(socketPath: String = cmuxSocketPath(),
                 group: EventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1),
@@ -30,6 +30,14 @@ public final class CmuxConnection: @unchecked Sendable {
         self.socketPath = socketPath
         self.group = group
         self.socketPassword = socketPassword
+        let opener: @Sendable () async throws -> CMUXClient = {
+            try await CmuxConnection.openClient(socketPath: socketPath,
+                                                group: group,
+                                                socketPassword: socketPassword)
+        }
+        let alive: @Sendable (CMUXClient) async -> Bool = { await $0.isUsable() }
+        self.dispatchResource = ReconnectingResource(open: opener, isAlive: alive)
+        self.eventsResource = ReconnectingResource(open: opener, isAlive: alive)
     }
 
     /// Test factory — points at a non-existent socket so calling `connect()`
@@ -43,10 +51,7 @@ public final class CmuxConnection: @unchecked Sendable {
     /// Default entry point — returns the dispatch client used for ordinary
     /// RPC traffic (workspace.list, surface.subscribe, screen.diff, …).
     public func connect() async throws -> CMUXClient {
-        if let c = dispatchClient { return c }
-        let c = try await openClient()
-        self.dispatchClient = c
-        return c
+        try await dispatchResource.get()
     }
 
     /// Dedicated channel for the long-lived `events.stream` subscription.
@@ -55,15 +60,20 @@ public final class CmuxConnection: @unchecked Sendable {
     /// client for the subscription — the symptom would be every
     /// dispatched call timing out at the 5 s `CMUXClient.requestTimeout`.
     public func connectForEvents() async throws -> CMUXClient {
-        if let c = eventsClient { return c }
-        let c = try await openClient()
-        self.eventsClient = c
-        return c
+        try await eventsResource.get()
     }
 
-    private func openClient() async throws -> CMUXClient {
+    /// Drop the cached events client so the supervisor's next
+    /// `connectForEvents()` re-dials after a detach.
+    public func invalidateEvents() async {
+        await eventsResource.invalidate()
+    }
+
+    private static func openClient(socketPath: String,
+                                   group: EventLoopGroup,
+                                   socketPassword: String?) async throws -> CMUXClient {
         let chan = try await UnixSocketChannel(path: socketPath, group: group)
-            .connect { _ in self.group.next().makeSucceededFuture(()) }
+            .connect { _ in group.next().makeSucceededFuture(()) }
         let c = CMUXClient(channel: chan, requestTimeout: .seconds(5))
         // CMUXClient installs its inbound bridge in a fire-and-forget Task
         // inside its initializer; without this gate the very first RPC

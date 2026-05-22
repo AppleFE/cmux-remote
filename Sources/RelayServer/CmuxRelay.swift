@@ -51,20 +51,35 @@ struct Serve: AsyncParsableCommand {
             Task { await manager.broadcastReset() }
         }
         Task {
-            do {
-                let client = try await conn.connectForEvents()
-                let stream = EventStream(client: client) { event in
-                    if event.category == .system,
-                       let boot = try? event.payload.decode(BootInfo.self)
-                    {
-                        conn.observe(bootInfo: boot)
+            var policy = ReconnectPolicy()
+            while !Task.isCancelled {
+                do {
+                    let client = try await conn.connectForEvents()
+                    let stream = EventStream(client: client) { event in
+                        if event.category == .system,
+                           let boot = try? event.payload.decode(BootInfo.self)
+                        {
+                            conn.observe(bootInfo: boot)
+                        }
+                        Task { await manager.broadcastToAll(frame: .event(event)) }
                     }
-                    Task { await manager.broadcastToAll(frame: .event(event)) }
+                    await stream.start(categories: EventCategory.allCases)
+                    logger.info("cmux event stream attached")
+                    let attachedAt = ContinuousClock.now
+                    await client.awaitClosed()
+                    // Only treat this as a healthy connection (and reset backoff)
+                    // if it stayed attached a while; otherwise a flapping/crash-
+                    // looping cmux would be re-attacked every base interval.
+                    if ContinuousClock.now - attachedAt > .seconds(5) {
+                        policy.reset()
+                    }
+                    logger.warning("cmux event stream detached; will re-attach")
+                    await conn.invalidateEvents()
+                } catch {
+                    logger.warning("cmux event stream unavailable: \(String(describing: error))")
                 }
-                await stream.start(categories: EventCategory.allCases)
-                logger.info("cmux event stream attached")
-            } catch {
-                logger.warning("cmux event stream unavailable: \(String(describing: error))")
+                let delay = policy.nextDelay()
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
         let deviceStore = try DeviceStore(url: URL(fileURLWithPath: devicesStorePath()))

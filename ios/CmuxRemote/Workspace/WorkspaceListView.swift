@@ -3,6 +3,7 @@ import SharedKit
 
 struct WorkspaceListView: View {
     @Bindable var store: WorkspaceStore
+    let notifStore: NotificationStore
     @State private var creating = false
     @State private var newName = ""
     @State private var searchText = ""
@@ -21,6 +22,7 @@ struct WorkspaceListView: View {
                             WorkspaceCard(
                                 workspace: workspace,
                                 surfaceCount: store.surfaceCount(for: workspace.id),
+                                unreadCount: notifStore.unreadByWorkspace[workspace.id] ?? 0,
                                 isSelected: store.selectedId == workspace.id
                             ) {
                                 store.selectedId = workspace.id
@@ -136,6 +138,7 @@ struct WorkspaceListView: View {
 private struct WorkspaceCard: View {
     let workspace: Workspace
     let surfaceCount: Int
+    let unreadCount: Int
     let isSelected: Bool
     let action: () -> Void
 
@@ -172,6 +175,17 @@ private struct WorkspaceCard: View {
                 }
 
                 Spacer()
+
+                if unreadCount > 0 {
+                    Text(unreadCount > 99 ? "99+" : "\(unreadCount)")
+                        .cmuxDisplay(9)
+                        .foregroundStyle(CmuxTheme.canvas)
+                        .padding(.horizontal, 5)
+                        .frame(minWidth: 18, minHeight: 18)
+                        .background(CmuxTheme.accentRed)
+                        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                        .accessibilityLabel("\(unreadCount) unread notifications")
+                }
 
                 if isSelected {
                     Text("→")
