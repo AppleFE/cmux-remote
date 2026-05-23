@@ -89,3 +89,10 @@ struct ReadTextPayload: Decodable {
         )
     }
 }
+
+public struct UploadedFilePayload: Decodable {
+    let filename: String
+    let path: String
+    let bytes: Int
+    let mimeType: String
+}

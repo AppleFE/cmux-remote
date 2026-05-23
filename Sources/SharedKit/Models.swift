@@ -52,5 +52,20 @@ public struct BootInfo: Codable, Sendable, Equatable {
 }
 
 public enum EventCategory: String, Codable, Sendable, CaseIterable {
-    case workspace, surface, notification, system
+    case workspace, surface, notification, system, unknown
+
+    public static var allCases: [EventCategory] {
+        [.workspace, .surface, .notification, .system]
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = EventCategory(rawValue: rawValue) ?? .unknown
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }

@@ -117,4 +117,15 @@ final class HTTPServerTests: XCTestCase {
                               "WS upgrade without bearer must not succeed; got \(resp.statusCode)")
         }
     }
+
+    func testWebSocketFrameLimitCoversMaxFileUploadEnvelope() {
+        let base64Length = ((RelayFileUploadService.maxBytes + 2) / 3) * 4
+        let conservativeJSONEnvelopeOverhead = 4096
+
+        XCTAssertGreaterThanOrEqual(
+            HTTPServer.maxWebSocketFrameBytes,
+            base64Length + conservativeJSONEnvelopeOverhead,
+            "file.upload sends base64 in one JSON-RPC WebSocket frame; the decoder limit must not close normal image uploads"
+        )
+    }
 }

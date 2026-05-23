@@ -7,6 +7,12 @@ struct WorkspaceListView: View {
     @State private var creating = false
     @State private var newName = ""
     @State private var searchText = ""
+    @State private var pendingRenameWorkspace: Workspace?
+    @State private var renameName = ""
+    @State private var renamingWorkspaceId: String?
+    @State private var pendingCloseWorkspace: Workspace?
+    @State private var closingWorkspaceId: String?
+    @State private var workspaceActionError: String?
     var onSelect: (Workspace) -> Void
 
     var body: some View {
@@ -23,13 +29,41 @@ struct WorkspaceListView: View {
                                 workspace: workspace,
                                 surfaceCount: store.surfaceCount(for: workspace.id),
                                 unreadCount: notifStore.unreadByWorkspace[workspace.id] ?? 0,
-                                isSelected: store.selectedId == workspace.id
+                                isSelected: store.selectedId == workspace.id,
+                                isRenaming: renamingWorkspaceId == workspace.id,
+                                isClosing: closingWorkspaceId == workspace.id,
+                                onRename: {
+                                    renameName = workspace.name
+                                    pendingRenameWorkspace = workspace
+                                },
+                                onClose: { pendingCloseWorkspace = workspace }
                             ) {
                                 store.selectedId = workspace.id
                                 onSelect(workspace)
                             }
                         }
                     }
+                }
+
+                if let workspaceActionError {
+                    HStack(spacing: 8) {
+                        Text("!")
+                            .cmuxDisplay(11)
+                        Text(workspaceActionError)
+                            .cmuxMono(11)
+                            .lineLimit(3)
+                    }
+                    .foregroundStyle(CmuxTheme.accentRed)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(CmuxTheme.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(CmuxTheme.accentRed.opacity(0.5), lineWidth: 1)
+                    )
+                    .accessibilityIdentifier("WorkspaceActionError")
                 }
 
                 if filteredWorkspaces.isEmpty {
@@ -61,6 +95,53 @@ struct WorkspaceListView: View {
                 }
             }
             Button("Cancel", role: .cancel) {}
+        }
+        .alert(
+            "Rename Workspace",
+            isPresented: Binding(
+                get: { pendingRenameWorkspace != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingRenameWorkspace = nil
+                        renameName = ""
+                    }
+                }
+            )
+        ) {
+            TextField("name", text: $renameName)
+            Button("Rename") {
+                guard let workspace = pendingRenameWorkspace else { return }
+                let title = renameName.trimmingCharacters(in: .whitespacesAndNewlines)
+                pendingRenameWorkspace = nil
+                renameName = ""
+                if !title.isEmpty {
+                    renameWorkspace(workspace, title: title)
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                pendingRenameWorkspace = nil
+                renameName = ""
+            }
+        }
+        .confirmationDialog(
+            "Close workspace?",
+            isPresented: Binding(
+                get: { pendingCloseWorkspace != nil },
+                set: { isPresented in
+                    if !isPresented { pendingCloseWorkspace = nil }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let workspace = pendingCloseWorkspace {
+                Button("Close \(workspace.name)", role: .destructive) {
+                    pendingCloseWorkspace = nil
+                    closeWorkspace(workspace)
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingCloseWorkspace = nil }
+        } message: {
+            Text("This closes the workspace in cmux.")
         }
         .task { await store.refresh() }
         .refreshable { await store.refresh() }
@@ -133,6 +214,34 @@ struct WorkspaceListView: View {
         case .error:        return CmuxTheme.accentRed
         }
     }
+
+    private func renameWorkspace(_ workspace: Workspace, title: String) {
+        guard renamingWorkspaceId == nil else { return }
+        workspaceActionError = nil
+        renamingWorkspaceId = workspace.id
+        Task { @MainActor in
+            defer { renamingWorkspaceId = nil }
+            do {
+                try await store.rename(workspaceId: workspace.id, title: title)
+            } catch {
+                workspaceActionError = String(describing: error)
+            }
+        }
+    }
+
+    private func closeWorkspace(_ workspace: Workspace) {
+        guard closingWorkspaceId == nil else { return }
+        workspaceActionError = nil
+        closingWorkspaceId = workspace.id
+        Task { @MainActor in
+            defer { closingWorkspaceId = nil }
+            do {
+                try await store.close(workspaceId: workspace.id)
+            } catch {
+                workspaceActionError = String(describing: error)
+            }
+        }
+    }
 }
 
 private struct WorkspaceCard: View {
@@ -140,71 +249,124 @@ private struct WorkspaceCard: View {
     let surfaceCount: Int
     let unreadCount: Int
     let isSelected: Bool
+    let isRenaming: Bool
+    let isClosing: Bool
+    let onRename: () -> Void
+    let onClose: () -> Void
+    let action: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Button(action: action) {
+                HStack(spacing: 14) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(CmuxTheme.surfaceSunken)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .strokeBorder(isSelected ? CmuxTheme.accentGreen : CmuxTheme.divider, lineWidth: 1)
+                            )
+                        Text(String(format: "%02d", workspace.index + 1))
+                            .cmuxDisplay(13)
+                            .foregroundStyle(isSelected ? CmuxTheme.accentGreen : CmuxTheme.muted)
+                    }
+                    .frame(width: 44, height: 44)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(workspace.name)
+                            .cmuxMono(15, weight: .medium)
+                            .foregroundStyle(CmuxTheme.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
+                        HStack(spacing: 6) {
+                            Text("\(surfaceCount)")
+                                .cmuxDisplay(11)
+                                .foregroundStyle(CmuxTheme.accentBlue)
+                            Text("surfaces")
+                                .cmuxMono(11)
+                                .foregroundStyle(CmuxTheme.muted)
+                        }
+                    }
+
+                    Spacer()
+
+                    if unreadCount > 0 {
+                        Text(unreadCount > 99 ? "99+" : "\(unreadCount)")
+                            .cmuxDisplay(9)
+                            .foregroundStyle(CmuxTheme.canvas)
+                            .padding(.horizontal, 5)
+                            .frame(minWidth: 18, minHeight: 18)
+                            .background(CmuxTheme.accentRed)
+                            .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
+                            .accessibilityLabel("\(unreadCount) unread notifications")
+                    }
+
+                    if isSelected {
+                        Text("→")
+                            .cmuxDisplay(16)
+                            .foregroundStyle(CmuxTheme.accentGreen)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(workspace.name)
+
+            WorkspaceCardIconButton(
+                systemName: "pencil",
+                isLoading: isRenaming,
+                action: onRename
+            )
+            .disabled(isRenaming || isClosing)
+            .accessibilityLabel("Rename workspace \(workspace.name)")
+
+            WorkspaceCardIconButton(
+                systemName: "xmark",
+                isLoading: isClosing,
+                action: onClose
+            )
+            .disabled(isClosing || isRenaming)
+            .accessibilityLabel("Close workspace \(workspace.name)")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, minHeight: 70)
+        .background(isSelected ? CmuxTheme.surfaceRaised : CmuxTheme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(CmuxTheme.divider, lineWidth: 1)
+        )
+    }
+}
+
+private struct WorkspaceCardIconButton: View {
+    let systemName: String
+    let isLoading: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 14) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(CmuxTheme.surfaceSunken)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .strokeBorder(isSelected ? CmuxTheme.accentGreen : CmuxTheme.divider, lineWidth: 1)
-                        )
-                    Text(String(format: "%02d", workspace.index + 1))
-                        .cmuxDisplay(13)
-                        .foregroundStyle(isSelected ? CmuxTheme.accentGreen : CmuxTheme.muted)
-                }
-                .frame(width: 44, height: 44)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(workspace.name)
-                        .cmuxMono(15, weight: .medium)
-                        .foregroundStyle(CmuxTheme.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-                    HStack(spacing: 6) {
-                        Text("\(surfaceCount)")
-                            .cmuxDisplay(11)
-                            .foregroundStyle(CmuxTheme.accentBlue)
-                        Text("surfaces")
-                            .cmuxMono(11)
-                            .foregroundStyle(CmuxTheme.muted)
-                    }
-                }
-
-                Spacer()
-
-                if unreadCount > 0 {
-                    Text(unreadCount > 99 ? "99+" : "\(unreadCount)")
-                        .cmuxDisplay(9)
-                        .foregroundStyle(CmuxTheme.canvas)
-                        .padding(.horizontal, 5)
-                        .frame(minWidth: 18, minHeight: 18)
-                        .background(CmuxTheme.accentRed)
-                        .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
-                        .accessibilityLabel("\(unreadCount) unread notifications")
-                }
-
-                if isSelected {
-                    Text("→")
-                        .cmuxDisplay(16)
-                        .foregroundStyle(CmuxTheme.accentGreen)
+            ZStack {
+                if isLoading {
+                    ProgressView()
+                        .tint(CmuxTheme.muted)
+                        .scaleEffect(0.72)
+                } else {
+                    Image(systemName: systemName)
+                        .font(.system(size: 12, weight: .bold))
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .frame(maxWidth: .infinity, minHeight: 70)
-            .background(isSelected ? CmuxTheme.surfaceRaised : CmuxTheme.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .foregroundStyle(CmuxTheme.muted)
+            .frame(width: 34, height: 34)
+            .background(CmuxTheme.surfaceSunken)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .strokeBorder(CmuxTheme.divider, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(workspace.name)
     }
 }
 

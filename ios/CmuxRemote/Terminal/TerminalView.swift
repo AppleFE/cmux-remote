@@ -5,8 +5,6 @@ struct TerminalView: View {
     var topContentInset: CGFloat = 0
     var bottomContentInset: CGFloat = 0
     var scrollToBottomRequest: Int = 0
-    var mouseMode: Bool = false
-    var onMouseClick: ((Int, Int) -> Void)? = nil
     @State private var fontSize: CGFloat = 8
     @State private var pinchAnchorFontSize: CGFloat?
 
@@ -76,15 +74,6 @@ struct TerminalView: View {
                                     }
                                 }
                                 .frame(width: contentWidth, height: contentHeight)
-                                .contentShape(Rectangle())
-                                .onTapGesture(coordinateSpace: .local) { location in
-                                    guard mouseMode, let onMouseClick else { return }
-                                    let col = Int(((location.x - leftInset) / advance).rounded(.down))
-                                    let row = Int(((location.y - 8) / lineHeight).rounded(.down))
-                                    let clampedCol = max(0, min(col, store.grid.cols - 1))
-                                    let clampedRow = max(0, min(row, store.grid.rows.count - 1))
-                                    onMouseClick(clampedCol, clampedRow)
-                                }
                                 .cmuxScanlines()
 
                                 Color.clear

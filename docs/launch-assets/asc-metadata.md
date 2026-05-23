@@ -1,4 +1,4 @@
-# App Store Connect — Metadata Draft (v1.0)
+# App Store Connect — Metadata Draft (v1.0.2)
 
 App: **Cmux Remote** · Bundle ID `com.genie.CmuxRemote` · Team `2UANJX7ATM`
 
@@ -220,6 +220,34 @@ https://github.com/NewTurn2017/cmux-remote
 
 ---
 
+## Version 1.0.2 Release Notes
+
+### What’s New — en-US
+
+```
+Cmux Remote 1.0.2 focuses on day-to-day remote control quality:
+
+- Better iPhone keyboard behavior: Enter now dismisses the keyboard after sending, and the terminal/composer layout no longer leaves large blank gaps or hides controls when the keyboard is visible.
+- Workspace management from iPhone: create workspaces with the requested title, rename existing workspaces, and close unused workspaces directly from the workspace list.
+- Faster input controls: refreshed shortcut buttons, including /new and Space for OMX selection flows.
+- Image attachments: attach a photo from iPhone and send it through the relay to the connected computer.
+- Mac status in the app: show connected Mac battery information when the relay can provide it.
+- Inbox improvements: Claude/Codex-style needs-input events are surfaced reliably in the Inbox.
+```
+
+### 새로운 기능 — ko
+
+```
+cmux Remote 1.0.2는 iPhone에서 실제로 조작할 때 불편했던 부분을 집중 개선한 업데이트입니다.
+
+- 키보드 입력 경험 개선: Enter 전송 후 키보드가 자동으로 닫히고, 가상 키보드가 올라와도 터미널/입력창 레이아웃이 크게 비거나 가려지지 않도록 조정했습니다.
+- 워크스페이스 관리 추가: 새 워크스페이스 생성 시 입력한 이름이 그대로 반영되며, 기존 워크스페이스 이름 변경과 닫기를 iPhone에서 바로 할 수 있습니다.
+- 단축 버튼 개선: /new, Space 등 모바일에서 자주 쓰는 입력을 빠르게 보낼 수 있게 정리했습니다.
+- 이미지 첨부 지원: iPhone 사진을 첨부해 연결된 컴퓨터로 전달할 수 있습니다.
+- 연결된 Mac 상태 표시: relay가 제공하는 경우 MacBook 배터리 상태를 앱에서 확인할 수 있습니다.
+- Inbox 개선: Claude/Codex 계열 세션의 needs input 알림을 Inbox에서 더 안정적으로 표시합니다.
+```
+
 ## App Privacy ("Data Used to Track You" / "Data Collected")
 
 | Question | Answer |
@@ -257,10 +285,10 @@ To evaluate the full app:
 5. The app re-bootstraps with simulated workspaces, terminal output, and notifications. A yellow "DEMO" badge appears in the workspace header.
 
 In demo mode you can:
-- See two demo workspaces (mybest-edu-ai, cmux-remote)
-- Open four demo surfaces (Claude Code session, shell, swift test, relay log)
-- Tap arrow keys / Esc / Tab — they no-op safely
-- Open the Inbox tab to see two demo notifications
+- Browse six populated demo workspaces (agent-lab, study-bot, cmux-remote, next-app, infra-ops, inbox-zero)
+- Open demo surfaces such as Claude Code, Codex, omx, shell, lazygit, vim, relay logs, and k9s
+- Tap arrow keys / Esc / Tab / shortcut buttons — they no-op safely in demo mode
+- Open the Inbox tab to see demo notifications, including an AI-agent needs-input example
 - Toggle demo mode off via the same Settings button
 
 The app has zero data collection, no analytics, no third-party SDKs, no advertising. Full source code: https://github.com/NewTurn2017/cmux-remote
@@ -309,14 +337,14 @@ App previews (video): not required for v1.0.
 
 - [ ] Apple Developer Program active ($99/yr)
 - [ ] App registered in App Store Connect with bundle id `com.genie.CmuxRemote`
-- [ ] Demo Mode verified to work in Release build
+- [ ] Demo Mode verified to work in Release build for v1.0.2 build 3
 - [ ] `ITSAppUsesNonExemptEncryption=false` in Info.plist (✅ done)
 - [ ] PRIVACY.md committed and accessible at the URL above (✅ done)
 - [ ] App Review Notes pasted from this document
 - [ ] Both en-US and ko metadata filled in
 - [ ] Screenshots uploaded for at least 6.9"
 - [ ] In-App Purchases: none (v1.0)
-- [ ] Build archived with Release config + Distribution provisioning profile
+- [x] Build archived with Release config + Distribution provisioning profile for v1.0.2 build 3
 - [ ] Build uploaded via Xcode → Organizer → Distribute App → App Store Connect
 - [ ] TestFlight internal test passes (recommended before public submit)
 - [ ] Submit for Review

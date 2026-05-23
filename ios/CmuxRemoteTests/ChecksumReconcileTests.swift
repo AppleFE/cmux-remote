@@ -20,9 +20,14 @@ final class ChecksumReconcileTests: XCTestCase {
 
 actor StubRPCDispatch: RPCDispatch {
     private(set) var calls: [(method: String, params: JSONValue)] = []
+    private var workspaces: [(id: String, title: String)]
     private var surfaces: [(id: String, title: String)]
 
-    init(surfaces: [(String, String)] = [("s1", "shell")]) {
+    init(
+        workspaces: [(String, String)] = [("w1", "Demo")],
+        surfaces: [(String, String)] = [("s1", "shell")]
+    ) {
+        self.workspaces = workspaces.map { (id: $0.0, title: $0.1) }
         self.surfaces = surfaces.map { (id: $0.0, title: $0.1) }
     }
 
@@ -31,8 +36,51 @@ actor StubRPCDispatch: RPCDispatch {
         switch method {
         case "workspace.list":
             return RPCResponse(id: "stub", result: .object([
-                "workspaces": .array([.object(["id": .string("w1"), "title": .string("Demo"), "index": .int(0)])])
+                "workspaces": .array(workspaces.enumerated().map { index, workspace in
+                    .object([
+                        "id": .string(workspace.id),
+                        "title": .string(workspace.title),
+                        "index": .int(Int64(index)),
+                    ])
+                })
             ]))
+        case "workspace.create":
+            if case .object(let params) = params {
+                let title: String
+                if case .string(let value)? = params["title"] {
+                    title = value
+                } else if case .string(let value)? = params["name"] {
+                    title = value
+                } else {
+                    title = "Terminal \(workspaces.count + 1)"
+                }
+                let workspaceId = "w\(workspaces.count + 1)"
+                workspaces.append((workspaceId, title))
+                return RPCResponse(id: "stub", ok: true, result: .object([
+                    "workspace_id": .string(workspaceId),
+                    "workspace": .object([
+                        "id": .string(workspaceId),
+                        "title": .string(title),
+                        "index": .int(Int64(workspaces.count - 1)),
+                    ]),
+                ]))
+            }
+            return RPCResponse(id: "stub", ok: true, result: .object([:]))
+        case "workspace.rename":
+            if case .object(let params) = params,
+               case .string(let workspaceId)? = params["workspace_id"],
+               case .string(let title)? = params["title"],
+               let index = workspaces.firstIndex(where: { $0.id == workspaceId })
+            {
+                workspaces[index].title = title
+            }
+            return RPCResponse(id: "stub", ok: true, result: .object([:]))
+        case "workspace.close":
+            if case .object(let params) = params, case .string(let workspaceId)? = params["workspace_id"] {
+                workspaces.removeAll { $0.id == workspaceId }
+                surfaces.removeAll()
+            }
+            return RPCResponse(id: "stub", ok: true, result: .object([:]))
         case "surface.list":
             return RPCResponse(id: "stub", result: .object([
                 "surfaces": .array(surfaces.enumerated().map { index, surface in
@@ -54,6 +102,21 @@ actor StubRPCDispatch: RPCDispatch {
             return RPCResponse(id: "stub", ok: true, result: .object([:]))
         case "surface.read_text":
             return RPCResponse(id: "stub", result: .object(["text": .string("fresh")]))
+        case "file.upload":
+            return RPCResponse(id: "stub", result: .object([
+                "filename": .string("photo.jpg"),
+                "path": .string("/Users/demo/Downloads/cmux-remote/photo.jpg"),
+                "bytes": .int(3),
+                "mime_type": .string("image/jpeg"),
+            ]))
+        case "host.battery":
+            return RPCResponse(id: "stub", result: .object([
+                "available": .bool(true),
+                "percent": .int(88),
+                "state": .string("charged"),
+                "is_charging": .bool(true),
+                "power_source": .string("AC Power"),
+            ]))
         default:
             return RPCResponse(id: "stub", ok: true, result: .object([:]))
         }

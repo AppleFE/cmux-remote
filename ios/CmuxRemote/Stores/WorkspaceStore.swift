@@ -57,7 +57,30 @@ public final class WorkspaceStore {
     }
 
     public func create(name: String) async throws {
-        _ = try await rpc.call(method: "workspace.create", params: .object(["name": .string(name)])).requireOk()
+        _ = try await rpc.call(method: "workspace.create", params: .object(["title": .string(name)])).requireOk()
+        await refresh()
+    }
+
+    public func rename(workspaceId: String, title: String) async throws {
+        _ = try await rpc.call(
+            method: "workspace.rename",
+            params: .object([
+                "workspace_id": .string(workspaceId),
+                "title": .string(title),
+            ])
+        ).requireOk()
+        await refresh()
+    }
+
+    public func close(workspaceId: String) async throws {
+        _ = try await rpc.call(
+            method: "workspace.close",
+            params: .object(["workspace_id": .string(workspaceId)])
+        ).requireOk()
+        surfacesByWorkspaceId[workspaceId] = nil
+        if selectedId == workspaceId {
+            selectedId = nil
+        }
         await refresh()
     }
 

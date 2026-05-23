@@ -115,18 +115,17 @@ cmux 소스 코드는 이 저장소에 포함되지 않습니다. 문서화된 J
 
 ### 입력
 
-- 액세서리 바: `esc` `↵` `⇧↵` `/` `$` `tab` `← ↑ ↓ →` `ms` `↺p`
-- 커맨드 컴포저 — 텍스트 입력 + 엔터 묶음 전송, 모디파이어 토글
+- 액세서리 바: `esc` `OK` `/` `$` `tab` `← ↑ ↓ →` `/new` `space`
+- 키보드 닫기 / 백스페이스 / iPhone 클립보드 붙여넣기 / 사진 첨부 버튼
+- 커맨드 컴포저 — 텍스트 입력 + 엔터 묶음 전송, 전송 후 키보드 자동 닫힘
+- 사진 첨부는 iPhone 이미지를 Mac의 `~/Downloads/cmux-remote/`로 저장하고
+  입력창에 저장 경로를 삽입
 - `surface.send_key`는 `NSEvent` synth — 화살표/Ctrl 조합 등 멀티바이트
   시퀀스가 atomic하게 전달. Ink 기반 TUI (Claude Code 등)의 ESC 파서
   타임아웃 문제 해결.
 - **포커스 게이트** — 구독 / 재구독 / 매 sendKey 직전 `surface.focus`
   자동 호출. 책상에서 cmux 포커스를 옮긴 뒤에도 iPhone 키가 의도한
   surface로 도착.
-- **pane 토글 (`↺p`)** — omx 등이 raw-mode 프롬프트를 서브 pane으로
-  띄울 때 그쪽으로 포커스 점프. `pane.last` 실패 시 `pane.list` 폴백.
-- **마우스 패스스루 (`ms`)** — 토글하면 터미널 탭이 xterm SGR
-  press/release로 전송. Textual / Bubble Tea / fzf / omx 메뉴가 반응.
 
 ### 알림
 
@@ -148,6 +147,7 @@ cmux 소스 코드는 이 저장소에 포함되지 않습니다. 문서화된 J
 - 디바이스 토큰: hashed bearer, 메뉴바에서 개별 revoke
 - per-device rate limiter + boot_id 기반 reset 브로드캐스트
 - launchd 유저 에이전트로 자동 시작, PATH 주입으로 `tailscale` CLI 발견
+- MacBook 배터리 상태 조회 (`host.battery`) 및 iPhone 헤더 배지 표시
 - events.stream 전용 cmux UDS 채널 분리 (구독 채널은 push-only lock)
 
 ### 보안

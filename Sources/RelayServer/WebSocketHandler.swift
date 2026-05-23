@@ -57,6 +57,9 @@ public actor WSProtocolMachine {
         guard let req = try? JSONDecoder().decode(RPCRequest.self, from: data) else {
             return []
         }
+        if let immediate = Self.relayOwnedResponse(for: req) {
+            return [.sendText(immediate)]
+        }
         if let relayAction = Self.relayOwnedAction(for: req) {
             return [relayAction]
         }
@@ -79,6 +82,22 @@ public actor WSProtocolMachine {
         helloed ? [] : [.close]
     }
 
+
+    private static func relayOwnedResponse(for req: RPCRequest) -> String? {
+        switch req.method {
+        case "host.battery":
+            return encode(RPCResponse(id: req.id, ok: true, result: HostBatteryService.snapshot().json, error: nil))
+        case "file.upload":
+            do {
+                let uploaded = try RelayFileUploadService.save(params: req.params)
+                return encode(RPCResponse(id: req.id, ok: true, result: uploaded.json, error: nil))
+            } catch {
+                return encode(errorResponse(id: req.id, code: "upload_failed", message: String(describing: error)))
+            }
+        default:
+            return nil
+        }
+    }
 
     private static func relayOwnedAction(for req: RPCRequest) -> Action? {
         guard case .object(let params) = req.params else { return nil }

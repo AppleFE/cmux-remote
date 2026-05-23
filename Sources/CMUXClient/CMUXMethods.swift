@@ -10,9 +10,17 @@ extension CMUXClient {
 
     public func workspaceCreate(name: String) async throws -> Workspace {
         let resp = try await call(method: "workspace.create",
-                                  params: .object(["name": .string(name)]))
+                                  params: .object(["title": .string(name)]))
         let raw = try resp.unwrapResult().decode(CMUXWorkspaceCreateRaw.self)
         return raw.workspace.toWorkspace()
+    }
+
+    public func workspaceRename(id: String, title: String) async throws {
+        _ = try await call(method: "workspace.rename",
+                           params: .object([
+                               "workspace_id": .string(id),
+                               "title": .string(title),
+                           ])).requireOk()
     }
 
     public func workspaceSelect(id: String) async throws {

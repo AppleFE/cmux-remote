@@ -45,6 +45,17 @@ struct WireProtocolTests {
         #expect(f.name == "notification.created")
     }
 
+    @Test func eventFrameDecodesUnknownCategoryAsUnknown() throws {
+        let raw = """
+        {"type":"event","category":"agent","name":"claude.needs_input","payload":{"status":"needs input"}}
+        """
+        let frame = try JSONDecoder().decode(PushFrame.self, from: Data(raw.utf8))
+        guard case .event(let f) = frame else { Issue.record("wrong"); return }
+        #expect(f.category == .unknown)
+        #expect(f.name == "claude.needs_input")
+        #expect(!EventCategory.allCases.contains(.unknown))
+    }
+
     @Test func pingPongDecodes() throws {
         let ping = try JSONDecoder().decode(PushFrame.self, from: Data(#"{"type":"ping","ts":42}"#.utf8))
         guard case .ping(let p) = ping else { Issue.record("wrong"); return }

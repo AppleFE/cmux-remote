@@ -64,50 +64,6 @@ public final class SurfaceStore {
         )
     }
 
-    /// Cycle cmux focus to the next pane in the current workspace. Useful
-    /// when omx (or any agent that shells out to a sub-pane for raw-mode
-    /// prompts) routes stdin to a sibling pane that the iPhone isn't
-    /// directly subscribed to — flipping focus puts that pane in
-    /// foreground so subsequent keystrokes from the iPhone reach it.
-    public func cycleNextPane() async throws {
-        guard let workspaceId = subscribedWorkspaceId else { return }
-        try await dispatchInput(successMessage: "pane.next") {
-            // First try the dedicated "previous focus" toggle. If cmux has
-            // no recorded previous pane (fresh workspace) it'll 404; fall
-            // back to enumerating panes and focusing the first one that
-            // isn't the currently subscribed surface's pane.
-            if let response = try? await rpc.call(
-                method: "pane.last",
-                params: .object(["workspace_id": .string(workspaceId)])
-            ), response.error == nil {
-                return response
-            }
-            let listed = try await rpc.call(
-                method: "pane.list",
-                params: .object(["workspace_id": .string(workspaceId)])
-            ).requireOk()
-            guard case .object(let result)? = listed.result,
-                  case .array(let panes)? = result["panes"]
-            else {
-                return listed
-            }
-            for entry in panes {
-                guard case .object(let pane) = entry,
-                      case .string(let paneId)? = pane["id"] ?? pane["pane_id"]
-                else { continue }
-                if case .bool(true)? = pane["focused"] { continue }
-                return try await rpc.call(
-                    method: "pane.focus",
-                    params: .object([
-                        "workspace_id": .string(workspaceId),
-                        "pane_id": .string(paneId),
-                    ])
-                ).requireOk()
-            }
-            return listed
-        }
-    }
-
     public func unsubscribe(surfaceId: String) async {
         _ = try? await rpc.call(method: "surface.unsubscribe", params: .object(["surface_id": .string(surfaceId)]))
         if subscribed == surfaceId {
@@ -148,29 +104,6 @@ public final class SurfaceStore {
         }
     }
 
-    /// xterm SGR mouse press+release at (col, row) — both 0-based, encoded
-    /// 1-based on the wire. Sent as raw escape via send_text so cmux passes
-    /// it straight to the TUI's pty. Only does anything when the foreground
-    /// program enabled mouse mode (Textual / Bubble Tea / fzf / omx etc.);
-    /// otherwise the CSI sequence is harmlessly ignored.
-    public func sendMouseClick(col: Int, row: Int) async throws {
-        guard let workspaceId = subscribedWorkspaceId,
-              let surfaceId = subscribed
-        else { return }
-        let press = "\u{001B}[<0;\(col + 1);\(row + 1)M"
-        let release = "\u{001B}[<0;\(col + 1);\(row + 1)m"
-        try await dispatchInput(successMessage: "Click @ \(col),\(row)") {
-            try await rpc.call(
-                method: "surface.send_text",
-                params: .object([
-                    "workspace_id": .string(workspaceId),
-                    "surface_id": .string(surfaceId),
-                    "text": .string(press + release),
-                ])
-            ).requireOk()
-        }
-    }
-
     public func sendText(workspaceId: String, surfaceId: String, text: String) async throws {
         try await dispatchInput(
             successMessage: text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -185,6 +118,26 @@ public final class SurfaceStore {
                     "text": .string(text),
                 ])
             ).requireOk()
+        }
+    }
+
+    public func uploadFile(data: Data, filename: String, mimeType: String) async throws -> UploadedFilePayload {
+        inputStatus = .sending
+        do {
+            let response = try await rpc.call(
+                method: "file.upload",
+                params: .object([
+                    "filename": .string(filename),
+                    "mime_type": .string(mimeType),
+                    "data_base64": .string(data.base64EncodedString()),
+                ])
+            ).requireOk()
+            let payload = try response.unwrapResult().decode(UploadedFilePayload.self)
+            inputStatus = .sent("Attached \(payload.filename)")
+            return payload
+        } catch {
+            inputStatus = .failed(String(describing: error))
+            throw error
         }
     }
 

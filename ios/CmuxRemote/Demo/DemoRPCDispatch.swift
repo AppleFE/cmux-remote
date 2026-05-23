@@ -14,8 +14,11 @@ public actor DemoRPCDispatch: RPCDispatch {
     public typealias SubscribeHandler = @Sendable (String) async -> Void
 
     private var onSubscribe: SubscribeHandler?
+    private var workspaces: [DemoWorkspace]
 
-    public init() {}
+    public init() {
+        self.workspaces = DemoContent.workspaces
+    }
 
     public func setOnSubscribe(_ handler: @escaping SubscribeHandler) {
         self.onSubscribe = handler
@@ -25,7 +28,7 @@ public actor DemoRPCDispatch: RPCDispatch {
         switch method {
         case "workspace.list":
             return RPCResponse(id: "demo", result: .object([
-                "workspaces": .array(DemoContent.workspaces.enumerated().map { index, ws in
+                "workspaces": .array(workspaces.enumerated().map { index, ws in
                     .object([
                         "id": .string(ws.id),
                         "title": .string(ws.title),
@@ -37,7 +40,7 @@ public actor DemoRPCDispatch: RPCDispatch {
         case "surface.list":
             guard case .object(let p) = params,
                   case .string(let workspaceId)? = p["workspace_id"],
-                  let workspace = DemoContent.workspaces.first(where: { $0.id == workspaceId })
+                  let workspace = workspaces.first(where: { $0.id == workspaceId })
             else {
                 return RPCResponse(id: "demo", result: .object(["surfaces": .array([])]))
             }
@@ -62,7 +65,7 @@ public actor DemoRPCDispatch: RPCDispatch {
         case "surface.read_text":
             if case .object(let p) = params,
                case .string(let surfaceId)? = p["surface_id"],
-               let surface = DemoContent.surface(for: surfaceId)
+               let surface = surface(for: surfaceId)
             {
                 return RPCResponse(id: "demo", result: .object([
                     "text": .string(surface.screen.joined(separator: "\n")),
@@ -70,26 +73,124 @@ public actor DemoRPCDispatch: RPCDispatch {
             }
             return RPCResponse(id: "demo", result: .object(["text": .string("")]))
 
-        case "surface.create":
-            return RPCResponse(id: "demo", result: .object([
-                "surface_id": .string("SF-DEMO-NEW-\(UUID().uuidString.prefix(8))"),
+        case "workspace.create":
+            let title: String
+            if case .object(let p) = params, case .string(let value)? = p["title"] {
+                title = value
+            } else if case .object(let p) = params, case .string(let value)? = p["name"] {
+                title = value
+            } else {
+                title = "Terminal \(workspaces.count + 1)"
+            }
+            let workspaceId = "WS-DEMO-NEW-\(UUID().uuidString.prefix(8))"
+            let workspace = DemoWorkspace(
+                id: workspaceId,
+                title: title,
+                surfaces: [DemoSurface(id: "SF-DEMO-NEW-\(UUID().uuidString.prefix(8))", title: "shell", screen: ["$", "", "new demo workspace"])]
+            )
+            workspaces.append(workspace)
+            return RPCResponse(id: "demo", ok: true, result: .object([
+                "workspace_id": .string(workspaceId),
+                "workspace": .object([
+                    "id": .string(workspace.id),
+                    "title": .string(workspace.title),
+                    "index": .int(Int64(workspaces.count - 1)),
+                ]),
             ]))
 
+        case "workspace.rename":
+            if case .object(let p) = params,
+               case .string(let title)? = p["title"]
+            {
+                let workspaceId: String?
+                if case .string(let id)? = p["workspace_id"] {
+                    workspaceId = id
+                } else {
+                    workspaceId = workspaces.first?.id
+                }
+                if let workspaceId, let index = workspaces.firstIndex(where: { $0.id == workspaceId }) {
+                    let old = workspaces[index]
+                    workspaces[index] = DemoWorkspace(id: old.id, title: title, surfaces: old.surfaces)
+                }
+            }
+            return RPCResponse(id: "demo", ok: true, result: .object([:]))
+
+        case "workspace.close":
+            if case .object(let p) = params, case .string(let workspaceId)? = p["workspace_id"], workspaces.count > 1 {
+                workspaces.removeAll { $0.id == workspaceId }
+            }
+            return RPCResponse(id: "demo", ok: true, result: .object([:]))
+
+        case "surface.create":
+            guard case .object(let p) = params,
+                  case .string(let workspaceId)? = p["workspace_id"],
+                  let workspaceIndex = workspaces.firstIndex(where: { $0.id == workspaceId })
+            else {
+                return RPCResponse(id: "demo", result: .object([
+                    "surface_id": .string("SF-DEMO-NEW-\(UUID().uuidString.prefix(8))"),
+                ]))
+            }
+            let old = workspaces[workspaceIndex]
+            let nextIndex = old.surfaces.count + 1
+            let surfaceId = "SF-DEMO-NEW-\(UUID().uuidString.prefix(8))"
+            let surface = DemoSurface(id: surfaceId, title: "shell \(nextIndex)", screen: ["$", "", "new demo surface"])
+            workspaces[workspaceIndex] = DemoWorkspace(id: old.id, title: old.title, surfaces: old.surfaces + [surface])
+            return RPCResponse(id: "demo", result: .object([
+                "surface_id": .string(surfaceId),
+            ]))
+
+        case "surface.close":
+            if case .object(let p) = params,
+               case .string(let workspaceId)? = p["workspace_id"],
+               case .string(let surfaceId)? = p["surface_id"],
+               let workspaceIndex = workspaces.firstIndex(where: { $0.id == workspaceId })
+            {
+                let old = workspaces[workspaceIndex]
+                if old.surfaces.count > 1 {
+                    workspaces[workspaceIndex] = DemoWorkspace(
+                        id: old.id,
+                        title: old.title,
+                        surfaces: old.surfaces.filter { $0.id != surfaceId }
+                    )
+                }
+            }
+            return RPCResponse(id: "demo", ok: true, result: .object([:]))
+
         case "surface.unsubscribe",
-             "surface.close",
              "surface.send_text",
              "surface.send_key",
              "surface.focus",
-             "pane.last",
-             "pane.focus",
              "notification.create":
             return RPCResponse(id: "demo", ok: true, result: .object([:]))
 
-        case "pane.list":
-            return RPCResponse(id: "demo", result: .object(["panes": .array([])]))
+        case "file.upload":
+            return RPCResponse(id: "demo", ok: true, result: .object([
+                "filename": .string("demo-image.jpg"),
+                "path": .string("/Users/demo/Downloads/cmux-remote/demo-image.jpg"),
+                "bytes": .int(42),
+                "mime_type": .string("image/jpeg"),
+            ]))
+
+        case "host.battery":
+            return RPCResponse(id: "demo", ok: true, result: .object([
+                "available": .bool(true),
+                "percent": .int(88),
+                "state": .string("charged"),
+                "is_charging": .bool(true),
+                "power_source": .string("AC Power"),
+            ]))
 
         default:
             return RPCResponse(id: "demo", ok: true, result: .object([:]))
         }
+    }
+
+    private func surface(for id: String) -> DemoSurface? {
+        for workspace in workspaces {
+            if let surface = workspace.surfaces.first(where: { $0.id == id }) {
+                return surface
+            }
+        }
+        return nil
     }
 }

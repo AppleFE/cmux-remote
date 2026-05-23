@@ -22,6 +22,12 @@ import Logging
 ///   the resolved `deviceId` so the WS layer never sees an unauthenticated
 ///   peer.
 public final class HTTPServer: @unchecked Sendable {
+    /// iPhone image uploads are sent as one JSON-RPC WebSocket text message
+    /// containing base64 data. SwiftNIO's default WebSocket decoder limit is
+    /// only 16 KiB, which makes normal Photos uploads close the socket before
+    /// `file.upload` reaches `WebSocketHandler`.
+    public static let maxWebSocketFrameBytes = 24 * 1024 * 1024
+
     public let group: MultiThreadedEventLoopGroup
     public let routes: Routes
     public let auth: AuthService
@@ -61,6 +67,7 @@ public final class HTTPServer: @unchecked Sendable {
             .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
             .childChannelInitializer { channel in
                 let upgrader = NIOWebSocketServerUpgrader(
+                    maxFrameSize: HTTPServer.maxWebSocketFrameBytes,
                     shouldUpgrade: { @Sendable ch, head in
                         let path = head.uri.split(separator: "?").first.map(String.init) ?? head.uri
                         guard path == "/v1/ws",

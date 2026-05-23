@@ -1,11 +1,17 @@
 import SwiftUI
 import UIKit
+import PhotosUI
 import SharedKit
 
 struct WorkspaceView: View {
+    private static let attachmentMaxDimension: CGFloat = 2048
+    private static let preferredAttachmentMaxBytes = 6 * 1024 * 1024
+    private static let attachmentJPEGQualities: [CGFloat] = [0.78, 0.68, 0.56]
+
     @Bindable var workspaceStore: WorkspaceStore
     @Bindable var surfaceStore: SurfaceStore
     @Bindable var notifStore: NotificationStore
+    @Bindable var hostStatusStore: HostStatusStore
     @Binding var preferredSurfaceId: String?
     let onBack: () -> Void
     @State private var showDrawer = false
@@ -19,7 +25,8 @@ struct WorkspaceView: View {
     @State private var pendingCloseSurface: Surface?
     @State private var surfaceActionInFlight = false
     @State private var surfaceActionError: String?
-    @State private var mouseMode = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var attachmentInFlight = false
     @AppStorage("cmux.demoMode") private var demoMode: Bool = false
     @FocusState private var commandFieldFocused: Bool
 
@@ -39,9 +46,7 @@ struct WorkspaceView: View {
                     store: surfaceStore,
                     topContentInset: terminalTopInset,
                     bottomContentInset: terminalBottomInset,
-                    scrollToBottomRequest: scrollToBottomRequest,
-                    mouseMode: mouseMode,
-                    onMouseClick: { col, row in sendMouseClick(col: col, row: row) }
+                    scrollToBottomRequest: scrollToBottomRequest
                 )
                 .ignoresSafeArea(.container, edges: .all)
 
@@ -51,7 +56,7 @@ struct WorkspaceView: View {
                         .padding(.top, 12)
                         .readHeight($headerHeight)
                     Spacer()
-                    terminalAccessory
+                    terminalAccessory()
                         .padding(.horizontal, 16)
                         .padding(.bottom, accessoryBottomPadding)
                         .readHeight($accessoryHeight)
@@ -99,6 +104,7 @@ struct WorkspaceView: View {
         .task {
             await subscribeFirstSurfaceIfNeeded()
             await consumePreferredSurfaceIfNeeded()
+            await hostStatusStore.refreshBattery()
         }
         .onChange(of: workspaceStore.selectedId) { _, newValue in
             Task {
@@ -123,6 +129,10 @@ struct WorkspaceView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             keyboardHeight = 0
+        }
+        .onChange(of: selectedPhotoItem) { _, item in
+            guard let item else { return }
+            Task { await attachPhoto(item) }
         }
     }
 
@@ -165,6 +175,9 @@ struct WorkspaceView: View {
                             .background(CmuxTheme.accentYellow)
                             .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
                             .accessibilityLabel("Demo mode active")
+                    }
+                    BatteryBadge(battery: hostStatusStore.battery) {
+                        Task { await hostStatusStore.refreshBattery() }
                     }
                     Spacer()
                     Text("×")
@@ -242,34 +255,36 @@ struct WorkspaceView: View {
         .accessibilityLabel("Scroll terminal to bottom")
     }
 
-    private var terminalAccessory: some View {
+    private func terminalAccessory() -> some View {
         VStack(spacing: 10) {
-            HStack(spacing: 8) {
-                Text("$")
-                    .cmuxDisplay(14)
-                    .foregroundStyle(CmuxTheme.accentGreen)
-                TextField("type a command…", text: $composer.draft, axis: .vertical)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .focused($commandFieldFocused)
-                    .cmuxMono(14)
-                    .foregroundStyle(CmuxTheme.ink)
-                    .submitLabel(.send)
-                    .lineLimit(1...3)
-                    .disabled(composer.isSending)
-                    .onSubmit { submitCommand() }
-                    .onTapGesture { commandFieldFocused = true }
-                    .accessibilityIdentifier("CommandComposerField")
+            HStack(alignment: .top, spacing: 8) {
+                HStack(spacing: 8) {
+                    Text("$")
+                        .cmuxDisplay(14)
+                        .foregroundStyle(CmuxTheme.accentGreen)
+                    TextField("type a command…", text: $composer.draft, axis: .vertical)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .focused($commandFieldFocused)
+                        .cmuxMono(14)
+                        .foregroundStyle(CmuxTheme.ink)
+                        .submitLabel(.send)
+                        .lineLimit(1...3)
+                        .disabled(composer.isSending)
+                        .onSubmit { submitCommand() }
+                        .onTapGesture { commandFieldFocused = true }
+                        .accessibilityIdentifier("CommandComposerField")
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .background(CmuxTheme.surfaceSunken)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(commandFieldFocused ? CmuxTheme.accentGreen : CmuxTheme.divider, lineWidth: 1)
+                )
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(CmuxTheme.surfaceSunken)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(commandFieldFocused ? CmuxTheme.accentGreen : CmuxTheme.divider, lineWidth: 1)
-            )
 
             HStack(spacing: 8) {
                 IconKey(systemName: "keyboard.chevron.compact.down",
@@ -279,6 +294,12 @@ struct WorkspaceView: View {
                 IconKey(systemName: "delete.left",
                         accessibilityLabel: "Send terminal backspace",
                         identifier: "CommandBackspaceButton") { sendKey(.backspace) }
+
+                IconKey(systemName: "doc.on.clipboard",
+                        accessibilityLabel: "Paste clipboard into command field",
+                        identifier: "CommandPasteButton") { pasteClipboard() }
+
+                PhotoAttachButton(isBusy: attachmentInFlight, selection: $selectedPhotoItem)
 
                 Spacer(minLength: 4)
 
@@ -328,15 +349,8 @@ struct WorkspaceView: View {
                 KeyButton(label: "↑", accessibilityLabel: "send up arrow") { sendKey(.up) }
                 KeyButton(label: "↓", accessibilityLabel: "send down arrow") { sendKey(.down) }
                 KeyButton(label: "→", accessibilityLabel: "send right arrow") { sendKey(.right) }
-                KeyButton(
-                    label: mouseMode ? "ms✓" : "ms",
-                    accessibilityLabel: mouseMode ? "disable mouse passthrough" : "enable mouse passthrough"
-                ) {
-                    mouseMode.toggle()
-                }
-                KeyButton(label: "↺p", accessibilityLabel: "toggle previous cmux pane") {
-                    togglePreviousPane()
-                }
+                KeyButton(label: "/new", accessibilityLabel: "send slash new shortcut") { sendText("/new") }
+                KeyButton(label: "space", accessibilityLabel: "send space for omx selection") { sendText(" ") }
             }
         }
         .padding(12)
@@ -354,19 +368,37 @@ struct WorkspaceView: View {
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 
+    private func pasteClipboard() {
+        composer.paste(UIPasteboard.general.string)
+        commandFieldFocused = true
+    }
+
     private func submitCommand() {
         if composer.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            sendKey(.enter)
+            dismissKeyboard()
+            Task {
+                do {
+                    let (workspaceId, surfaceId) = try activeSurface()
+                    try await surfaceStore.sendKey(workspaceId: workspaceId, surfaceId: surfaceId, key: .enter)
+                    await MainActor.run {
+                        composer.clearError()
+                        dismissKeyboard()
+                    }
+                } catch {
+                    await MainActor.run { composer.failSubmit(error) }
+                }
+            }
             return
         }
         guard let command = composer.beginSubmit() else { return }
+        dismissKeyboard()
         Task {
             do {
                 let (workspaceId, surfaceId) = try activeSurface()
                 try await surfaceStore.submitCommand(workspaceId: workspaceId, surfaceId: surfaceId, command: command)
                 await MainActor.run {
                     composer.completeSubmit(command)
-                    commandFieldFocused = true
+                    dismissKeyboard()
                 }
             } catch {
                 await MainActor.run { composer.failSubmit(error) }
@@ -410,28 +442,6 @@ struct WorkspaceView: View {
         }
     }
 
-    private func sendMouseClick(col: Int, row: Int) {
-        Task {
-            do {
-                try await surfaceStore.sendMouseClick(col: col, row: row)
-                await MainActor.run { composer.clearError() }
-            } catch {
-                await MainActor.run { composer.failSubmit(error) }
-            }
-        }
-    }
-
-    private func togglePreviousPane() {
-        Task {
-            do {
-                try await surfaceStore.cycleNextPane()
-                await MainActor.run { composer.clearError() }
-            } catch {
-                await MainActor.run { composer.failSubmit(error) }
-            }
-        }
-    }
-
     private func sendOK() {
         Task {
             do {
@@ -443,6 +453,64 @@ struct WorkspaceView: View {
                 await MainActor.run { composer.failSubmit(error) }
             }
         }
+    }
+
+    private func attachPhoto(_ item: PhotosPickerItem) async {
+        attachmentInFlight = true
+        defer {
+            attachmentInFlight = false
+            selectedPhotoItem = nil
+        }
+        do {
+            guard let rawData = try await item.loadTransferable(type: Data.self) else { return }
+            let prepared = prepareImageAttachment(rawData)
+            let uploaded = try await surfaceStore.uploadFile(
+                data: prepared.data,
+                filename: prepared.filename,
+                mimeType: prepared.mimeType
+            )
+            await MainActor.run {
+                appendPathToDraft(uploaded.path)
+                commandFieldFocused = true
+                composer.clearError()
+            }
+        } catch {
+            await MainActor.run { composer.failSubmit(error) }
+        }
+    }
+
+    private func prepareImageAttachment(_ data: Data) -> (data: Data, filename: String, mimeType: String) {
+        let timestamp = Self.attachmentTimestamp()
+        if let image = UIImage(data: data) {
+            let preparedImage = image.cmuxDownscaled(maxDimension: Self.attachmentMaxDimension)
+            var fallbackJPEG: Data?
+            for quality in Self.attachmentJPEGQualities {
+                guard let jpeg = preparedImage.jpegData(compressionQuality: quality) else { continue }
+                fallbackJPEG = jpeg
+                if jpeg.count <= Self.preferredAttachmentMaxBytes {
+                    return (jpeg, "iphone-image-\(timestamp).jpg", "image/jpeg")
+                }
+            }
+            if let fallbackJPEG {
+                return (fallbackJPEG, "iphone-image-\(timestamp).jpg", "image/jpeg")
+            }
+        }
+        return (data, "iphone-image-\(timestamp).jpg", "image/jpeg")
+    }
+
+    private func appendPathToDraft(_ path: String) {
+        if composer.draft.isEmpty || composer.draft.hasSuffix(" ") || composer.draft.hasSuffix("\n") {
+            composer.insert(path)
+        } else {
+            composer.insert(" \(path)")
+        }
+    }
+
+    private static func attachmentTimestamp() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return formatter.string(from: Date())
     }
 
 
@@ -710,6 +778,44 @@ private struct HeaderSquare: View {
     }
 }
 
+private struct BatteryBadge: View {
+    let battery: HostBatteryState
+    let refresh: () -> Void
+
+    var body: some View {
+        Button(action: refresh) {
+            HStack(spacing: 4) {
+                Image(systemName: batteryIcon)
+                    .font(.system(size: 10, weight: .bold))
+                Text(battery.displayText)
+                    .cmuxDisplay(9)
+            }
+            .foregroundStyle(battery.available ? CmuxTheme.accentGreen : CmuxTheme.muted)
+            .padding(.horizontal, 6)
+            .frame(height: 22)
+            .background(CmuxTheme.surfaceRaised.opacity(0.72))
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .strokeBorder(CmuxTheme.divider, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("HostBatteryBadge")
+        .accessibilityLabel(battery.accessibilityText)
+    }
+
+    private var batteryIcon: String {
+        if battery.isCharging == true { return "battery.100.bolt" }
+        guard let percent = battery.percent else { return "battery.0" }
+        switch percent {
+        case 75...100: return "battery.100"
+        case 35..<75: return "battery.50"
+        default: return "battery.25"
+        }
+    }
+}
+
 private struct IconKey: View {
     let systemName: String
     var accessibilityLabel: String? = nil
@@ -735,6 +841,38 @@ private struct IconKey: View {
     }
 }
 
+private struct PhotoAttachButton: View {
+    let isBusy: Bool
+    @Binding var selection: PhotosPickerItem?
+
+    var body: some View {
+        PhotosPicker(selection: $selection, matching: .images) {
+            Group {
+                if isBusy {
+                    ProgressView()
+                        .tint(CmuxTheme.ink)
+                        .scaleEffect(0.65)
+                } else {
+                    Image(systemName: "photo.badge.plus")
+                        .font(.system(size: 13, weight: .bold))
+                }
+            }
+            .foregroundStyle(CmuxTheme.ink)
+            .frame(width: 40, height: 36)
+            .background(CmuxTheme.surfaceRaised)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .strokeBorder(CmuxTheme.divider, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isBusy)
+        .accessibilityIdentifier("CommandPhotoAttachButton")
+        .accessibilityLabel("Attach photo from iPhone")
+    }
+}
+
 private struct KeyButton: View {
     let label: String
     var accessibilityLabel: String?
@@ -757,5 +895,19 @@ private struct KeyButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel ?? label.replacingOccurrences(of: "\n", with: " "))
+    }
+}
+
+private extension UIImage {
+    func cmuxDownscaled(maxDimension: CGFloat) -> UIImage {
+        let longestSide = max(size.width, size.height)
+        guard longestSide > maxDimension, longestSide > 0 else { return self }
+        let scale = maxDimension / longestSide
+        let targetSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: targetSize, format: format).image { _ in
+            draw(in: CGRect(origin: .zero, size: targetSize))
+        }
     }
 }

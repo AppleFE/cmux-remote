@@ -8,6 +8,7 @@ struct ContentView: View {
     let workspaceStore: WorkspaceStore
     let surfaceStore: SurfaceStore
     let notifStore: NotificationStore
+    let hostStatusStore: HostStatusStore
     let onDisconnect: () -> Void
     let onReconnect: () -> Void
     let onTriggerTestNotification: @MainActor () -> TestNotificationResult
@@ -25,6 +26,7 @@ struct ContentView: View {
                     workspaceStore: workspaceStore,
                     surfaceStore: surfaceStore,
                     notifStore: notifStore,
+                    hostStatusStore: hostStatusStore,
                     preferredSurfaceId: $requestedSurfaceId,
                     onBack: { selectedTab = .workspaces }
                 )

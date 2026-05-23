@@ -60,6 +60,65 @@ final class StoresTests: XCTestCase {
         })
     }
 
+
+    func testWorkspaceStoreCreatesWorkspaceWithRequestedTitle() async throws {
+        let rpc = StubRPCDispatch(workspaces: [("w1", "Demo")])
+        let store = WorkspaceStore(rpc: rpc)
+        await store.refresh()
+
+        try await store.create(name: "요술마켓")
+
+        XCTAssertEqual(store.workspaces.map(\.name), ["Demo", "요술마켓"])
+        let calls = await rpc.calls
+        XCTAssertTrue(calls.contains { call in
+            guard call.method == "workspace.create",
+                  case .object(let params) = call.params,
+                  case .string("요술마켓")? = params["title"]
+            else { return false }
+            return true
+        })
+    }
+
+    func testWorkspaceStoreRenamesWorkspaceWithTitleParam() async throws {
+        let rpc = StubRPCDispatch(workspaces: [("w1", "Demo"), ("w2", "Logs")])
+        let store = WorkspaceStore(rpc: rpc)
+        await store.refresh()
+
+        try await store.rename(workspaceId: "w2", title: "빌드 로그")
+
+        XCTAssertEqual(store.workspaces.map(\.name), ["Demo", "빌드 로그"])
+        let calls = await rpc.calls
+        XCTAssertTrue(calls.contains { call in
+            guard call.method == "workspace.rename",
+                  case .object(let params) = call.params,
+                  case .string("w2")? = params["workspace_id"],
+                  case .string("빌드 로그")? = params["title"]
+            else { return false }
+            return true
+        })
+    }
+
+    func testWorkspaceStoreClosesWorkspaceAndRefreshesSelection() async throws {
+        let rpc = StubRPCDispatch(workspaces: [("w1", "Demo"), ("w2", "Logs")])
+        let store = WorkspaceStore(rpc: rpc)
+        await store.refresh()
+        store.selectedId = "w1"
+
+        try await store.close(workspaceId: "w1")
+
+        XCTAssertEqual(store.workspaces.map(\.id), ["w2"])
+        XCTAssertEqual(store.selectedId, "w2")
+        XCTAssertNil(store.surfacesByWorkspaceId["w1"])
+        let calls = await rpc.calls
+        XCTAssertTrue(calls.contains { call in
+            guard call.method == "workspace.close",
+                  case .object(let params) = call.params,
+                  case .string("w1")? = params["workspace_id"]
+            else { return false }
+            return true
+        })
+    }
+
     func testStoresResetDisconnectState() async {
         let rpc = StubRPCDispatch()
         let workspaceStore = WorkspaceStore(rpc: rpc)
@@ -83,12 +142,20 @@ final class StoresTests: XCTestCase {
         try await surfaceStore.sendKey(workspaceId: "w1", surfaceId: "s1", key: .named("c", modifiers: [.ctrl]))
 
         let calls = await rpc.calls
-        XCTAssertEqual(calls.map(\.method), ["surface.send_text", "surface.send_key"])
+        XCTAssertEqual(calls.map(\.method), ["surface.send_text", "surface.focus", "surface.send_key"])
         XCTAssertEqual(surfaceStore.inputStatus, .sent("Sent ctrl+c"))
         XCTAssertTrue(calls.contains { call in
             guard call.method == "surface.send_text",
                   case .object(let params) = call.params,
                   case .string("ls\n")? = params["text"]
+            else { return false }
+            return true
+        })
+        XCTAssertTrue(calls.contains { call in
+            guard call.method == "surface.focus",
+                  case .object(let params) = call.params,
+                  case .string("w1")? = params["workspace_id"],
+                  case .string("s1")? = params["surface_id"]
             else { return false }
             return true
         })
@@ -124,6 +191,40 @@ final class StoresTests: XCTestCase {
             else { return false }
             return true
         })
+    }
+
+    func testSurfaceStoreUploadsFileAndReportsPath() async throws {
+        let rpc = StubRPCDispatch()
+        let surfaceStore = SurfaceStore(rpc: rpc)
+
+        let payload = try await surfaceStore.uploadFile(
+            data: Data([0x01, 0x02, 0x03]),
+            filename: "photo.jpg",
+            mimeType: "image/jpeg"
+        )
+
+        XCTAssertEqual(payload.path, "/Users/demo/Downloads/cmux-remote/photo.jpg")
+        XCTAssertEqual(surfaceStore.inputStatus, .sent("Attached photo.jpg"))
+        let calls = await rpc.calls
+        XCTAssertTrue(calls.contains { call in
+            guard call.method == "file.upload",
+                  case .object(let params) = call.params,
+                  case .string("photo.jpg")? = params["filename"],
+                  case .string("image/jpeg")? = params["mime_type"],
+                  case .string(Data([0x01, 0x02, 0x03]).base64EncodedString())? = params["data_base64"]
+            else { return false }
+            return true
+        })
+    }
+
+    func testHostStatusStoreRefreshesBattery() async {
+        let rpc = StubRPCDispatch()
+        let store = HostStatusStore(rpc: rpc)
+
+        await store.refreshBattery()
+
+        XCTAssertEqual(store.battery.percent, 88)
+        XCTAssertEqual(store.battery.displayText, "88% ↯")
     }
 
     func testSurfaceStoreReportsInputDispatchFailure() async {
@@ -199,6 +300,78 @@ final class StoresTests: XCTestCase {
         )))
 
         XCTAssertTrue(store.items.isEmpty)
+    }
+
+    func testNotificationStoreIngestsClaudeNeedsInputEvent() {
+        let store = NotificationStore()
+        let frame = PushFrame.event(EventFrame(
+            category: .surface,
+            name: "claude.needs_input",
+            payload: .object([
+                "workspace_id": .string("w1"),
+                "surface_id": .string("s1"),
+                "title": .string("Claude Code"),
+                "body": .string("needs input"),
+                "id": .string("need-1"),
+            ])
+        ))
+
+        store.ingest(frame)
+
+        XCTAssertEqual(store.items.count, 1)
+        XCTAssertEqual(store.items.first?.id, "need-1")
+        XCTAssertEqual(store.items.first?.workspaceId, "w1")
+        XCTAssertEqual(store.items.first?.surfaceId, "s1")
+        XCTAssertEqual(store.items.first?.title, "Claude Code")
+        XCTAssertEqual(store.items.first?.body, "needs input")
+    }
+
+    func testNotificationStoreDedupesNeedsInputWithoutExplicitId() {
+        let store = NotificationStore()
+        var fired: [String] = []
+        store.onNew = { record in fired.append(record.id) }
+        let frame = PushFrame.event(EventFrame(
+            category: .unknown,
+            name: "surface.needs-input",
+            payload: .object([
+                "workspaceId": .string("w1"),
+                "surfaceId": .string("s1"),
+                "source": .string("Claude Code"),
+                "status": .string("needs input"),
+            ])
+        ))
+
+        store.ingest(frame)
+        store.ingest(frame)
+
+        XCTAssertEqual(store.items.count, 2)
+        XCTAssertEqual(fired.count, 1)
+        XCTAssertEqual(store.items.first?.id, fired.first)
+        XCTAssertEqual(store.items.first?.title, "Claude Code needs input")
+        XCTAssertEqual(store.items.first?.body, "needs input")
+    }
+
+    func testNotificationStoreIngestsNestedClaudeNeedsAttentionEvent() {
+        let store = NotificationStore()
+        let frame = PushFrame.event(EventFrame(
+            category: .unknown,
+            name: "notification",
+            payload: .object([
+                "workspace": .string("w2"),
+                "surface": .string("s2"),
+                "details": .object([
+                    "message": .string("Claude Code needs your attention"),
+                ]),
+            ])
+        ))
+
+        store.ingest(frame)
+
+        XCTAssertEqual(store.items.count, 1)
+        XCTAssertEqual(store.items.first?.workspaceId, "w2")
+        XCTAssertEqual(store.items.first?.surfaceId, "s2")
+        XCTAssertEqual(store.items.first?.title, "Claude Code needs input")
+        XCTAssertEqual(store.items.first?.body, "Claude Code needs your attention")
     }
 
     func testNotificationStoreFiresOnNewOnceForRepeatedId() {

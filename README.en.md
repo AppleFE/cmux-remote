@@ -25,10 +25,11 @@ cmux exclusively over a documented JSON-RPC protocol.
 - send keystrokes, key combinations, raw text, and command lines
 - surface cmux notifications as iOS local notifications (while the app
   is alive)
-- pass through taps as xterm SGR mouse events for TUIs that opted in
-  (Textual / Bubble Tea / fzf / omx menus)
-- pin cmux pane focus on every send, plus a "previous pane" toggle for
-  agents that shell out to sub-panes
+- paste iPhone clipboard text into the command composer
+- attach iPhone photos by saving them to the Mac under
+  `~/Downloads/cmux-remote/` and inserting the saved path
+- show the connected MacBook battery state in the workspace header
+- pin cmux pane focus on every send
 
 Smoke-tested against macOS 14 + iOS 17 on both LAN and across a Tailnet
 (Tailscale 1.84+), on simulator and a physical iPhone.
@@ -125,9 +126,14 @@ client that talks to cmux over a documented JSON-RPC schema.
 
 ### Input
 
-- Accessory bar: `esc` `↵` `⇧↵` `/` `$` `tab` `← ↑ ↓ →` `ms` `↺p`
-- Command composer with text + enter as one shot, plus modifier
-  toggles
+- Accessory bar: `esc` `OK` `/` `$` `tab` `← ↑ ↓ →` `/new` `space`
+- Dedicated keyboard-dismiss, backspace, iPhone clipboard paste, and
+  photo attach buttons
+- Command composer with text + enter as one shot; the software keyboard
+  closes automatically after submit
+- Photo attachments are saved by the Mac relay under
+  `~/Downloads/cmux-remote/`, then the saved path is inserted into the
+  command field
 - `surface.send_key` is delivered via an `NSEvent` synth on the Mac
   side, so multi-byte sequences (arrows, ctrl-combos) arrive
   atomically — important for Ink-based TUIs (Claude Code etc.) whose
@@ -136,14 +142,6 @@ client that talks to cmux over a documented JSON-RPC schema.
 - **Focus gate** — every subscribe, resubscribe, and every `sendKey`
   re-pins `surface.focus` first. iPhone keys land on the surface you
   intended even after focus moved at the Mac.
-- **Pane toggle (`↺p`)** — jumps to the previously focused cmux pane.
-  Useful when omx (or any agent that shells out to a raw-mode prompt
-  in a sibling pane) is the actual stdin target. Falls back from
-  `pane.last` to `pane.list` + `pane.focus`.
-- **Mouse passthrough (`ms`)** — when toggled, taps on the terminal
-  emit xterm SGR press/release escapes via `surface.send_text`. Works
-  with Textual, Bubble Tea, fzf, omx menus — anything that opted into
-  mouse mode.
 
 ### Notifications
 
