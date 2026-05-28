@@ -1,4 +1,4 @@
-# App Store Connect — Metadata Draft (v1.0.2)
+# App Store Connect — Metadata Draft (v1.0.3)
 
 App: **Cmux Remote** · Bundle ID `com.genie.CmuxRemote` · Team `2UANJX7ATM`
 
@@ -224,32 +224,26 @@ https://github.com/NewTurn2017/cmux-remote
 
 ---
 
-## Version 1.0.2 Release Notes
+## Version 1.0.3 Release Notes
 
 ### What’s New — en-US
 
 ```
-Cmux Remote 1.0.2 focuses on day-to-day remote control quality:
+Cmux Remote 1.0.3 is an urgent reliability fix for real-device Mac connection setup.
 
-- Better mobile keyboard behavior: Enter now dismisses the keyboard after sending, and the terminal/composer layout no longer leaves large blank gaps or hides controls when the keyboard is visible.
-- Workspace management from the mobile app: create workspaces with the requested title, rename existing workspaces, and close unused workspaces directly from the workspace list.
-- Faster input controls: refreshed shortcut buttons, including /new and Space for OMX selection flows.
-- Image attachments: attach a photo from the mobile app and send it through the relay to the connected computer.
-- Connected computer status: show battery information when the relay can provide it.
-- Inbox improvements: Claude/Codex-style needs-input events are surfaced reliably in the Inbox.
+- Fixes Mac relay reconnection when cmux rotates its local Unix socket, preventing stale socket paths from leaving the iPhone stuck on “Connection refused”.
+- Reinstalls now leave the relay on dynamic socket discovery by default, so future cmux restarts are picked up automatically.
+- Adds regression coverage for socket-path fallback, stale marker recovery, and relay connection refresh behavior.
 ```
 
 ### 새로운 기능 — ko
 
 ```
-cmux Remote 1.0.2는 모바일에서 실제로 조작할 때 불편했던 부분을 집중 개선한 업데이트입니다.
+cmux Remote 1.0.3은 실기기 Mac 연결 안정성을 바로잡는 긴급 수정 업데이트입니다.
 
-- 키보드 입력 경험 개선: Enter 전송 후 키보드가 자동으로 닫히고, 가상 키보드가 올라와도 터미널/입력창 레이아웃이 크게 비거나 가려지지 않도록 조정했습니다.
-- 워크스페이스 관리 추가: 새 워크스페이스 생성 시 입력한 이름이 그대로 반영되며, 기존 워크스페이스 이름 변경과 닫기를 모바일에서 바로 할 수 있습니다.
-- 단축 버튼 개선: /new, Space 등 모바일에서 자주 쓰는 입력을 빠르게 보낼 수 있게 정리했습니다.
-- 이미지 첨부 지원: 모바일 사진을 첨부해 연결된 컴퓨터로 전달할 수 있습니다.
-- 연결된 컴퓨터 상태 표시: relay가 제공하는 경우 배터리 상태를 앱에서 확인할 수 있습니다.
-- Inbox 개선: Claude/Codex 계열 세션의 needs input 알림을 Inbox에서 더 안정적으로 표시합니다.
+- cmux가 로컬 Unix socket을 새로 만들 때 relay가 오래된 socket을 붙잡아 iPhone에서 “Connection refused”가 반복되던 문제를 수정했습니다.
+- 재설치 후 relay가 기본적으로 동적 socket 탐색을 사용하므로, 이후 cmux 재시작/교체도 자동으로 따라갑니다.
+- socket 경로 fallback, 오래된 marker 복구, relay 재연결 동작에 대한 회귀 테스트를 추가했습니다.
 ```
 
 ## App Privacy ("Data Used to Track You" / "Data Collected")
@@ -341,14 +335,14 @@ App previews (video): not required for v1.0.
 
 - [ ] Apple Developer Program active ($99/yr)
 - [ ] App registered in App Store Connect with bundle id `com.genie.CmuxRemote`
-- [ ] Demo Mode verified to work in Release build for v1.0.2 build 3
+- [ ] Demo Mode verified to work in Release build for v1.0.3 build 4
 - [ ] `ITSAppUsesNonExemptEncryption=false` in Info.plist (✅ done)
 - [ ] PRIVACY.md committed and accessible at the URL above (✅ done)
 - [ ] App Review Notes pasted from this document
 - [ ] Both en-US and ko metadata filled in
 - [ ] Screenshots uploaded for at least 6.9"
 - [ ] In-App Purchases: none (v1.0)
-- [x] Build archived with Release config + Distribution provisioning profile for v1.0.2 build 3
+- [x] Build archived with Release config + Distribution provisioning profile for v1.0.3 build 4
 - [ ] Build uploaded via Xcode → Organizer → Distribute App → App Store Connect
 - [ ] TestFlight internal test passes (recommended before public submit)
 - [ ] Submit for Review
