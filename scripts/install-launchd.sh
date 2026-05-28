@@ -37,7 +37,10 @@ BIN_SRC="$ROOT/.build/release/cmux-relay"
 BIN_DEST="$DEST/bin/cmux-relay"
 CONFIG="${CMUX_RELAY_CONFIG:-$DEST/relay.json}"
 LOGDIR="${CMUX_RELAY_LOGDIR:-$DEST/log}"
-SOCKET="${CMUX_SOCKET_PATH:-$HOME/Library/Application Support/cmux/cmux.sock}"
+# Leave CMUX_SOCKET_PATH empty by default so cmux-relay follows cmux's
+# last-socket-path marker at runtime. Set CMUX_SOCKET_PATH explicitly only when
+# the operator wants to pin the relay to a fixed socket.
+SOCKET="${CMUX_SOCKET_PATH:-}"
 DEV_ALLOW_LOCALHOST="${CMUX_DEV_ALLOW_LOCALHOST:-0}"
 # launchd starts agents with a stripped PATH; tailscale CLI on macOS lives in
 # /usr/local/bin (pkg install) or /opt/homebrew/bin (brew), so prepend both
@@ -100,7 +103,11 @@ if [ "$DRY_RUN" -eq 1 ]; then
   note "label: $LABEL"
   note "binary: $BIN_DEST"
   note "config: $CONFIG"
-  note "socket: $SOCKET"
+  if [ -n "$SOCKET" ]; then
+    note "socket override: $SOCKET"
+  else
+    note "socket override: <dynamic via cmux last-socket-path>"
+  fi
   note "logdir: $LOGDIR"
   note "plist: $PLIST"
   note "would run: swift build -c release"

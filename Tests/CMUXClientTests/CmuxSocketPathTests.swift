@@ -15,6 +15,55 @@ final class CmuxSocketPathTests: XCTestCase {
         XCTAssertTrue(p.hasSuffix("Library/Application Support/cmux/cmux.sock"), p)
     }
 
+    func testFollowsCmuxLastSocketPathWhenPresent() throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let cmuxDir = temp.appendingPathComponent("cmux", isDirectory: true)
+        try FileManager.default.createDirectory(at: cmuxDir, withIntermediateDirectories: true)
+        let liveSocket = cmuxDir.appendingPathComponent("cmux-501.sock", isDirectory: false)
+        _ = FileManager.default.createFile(atPath: liveSocket.path, contents: Data())
+        try "\(liveSocket.path)\n".write(
+            to: cmuxDir.appendingPathComponent("last-socket-path", isDirectory: false),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let p = cmuxSocketPath([:], appSupportDirectory: temp)
+
+        XCTAssertEqual(p, liveSocket.path)
+    }
+
+    func testFallsBackWhenLastSocketPathIsStale() throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let cmuxDir = temp.appendingPathComponent("cmux", isDirectory: true)
+        try FileManager.default.createDirectory(at: cmuxDir, withIntermediateDirectories: true)
+        try "/tmp/no-such-cmux.sock\n".write(
+            to: cmuxDir.appendingPathComponent("last-socket-path", isDirectory: false),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let p = cmuxSocketPath([:], appSupportDirectory: temp)
+
+        XCTAssertEqual(p, cmuxDir.appendingPathComponent("cmux.sock").path)
+    }
+
+    func testEnvOverrideWinsOverLastSocketPath() throws {
+        let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let cmuxDir = temp.appendingPathComponent("cmux", isDirectory: true)
+        try FileManager.default.createDirectory(at: cmuxDir, withIntermediateDirectories: true)
+        let liveSocket = cmuxDir.appendingPathComponent("cmux-501.sock", isDirectory: false)
+        _ = FileManager.default.createFile(atPath: liveSocket.path, contents: Data())
+        try "\(liveSocket.path)\n".write(
+            to: cmuxDir.appendingPathComponent("last-socket-path", isDirectory: false),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let p = cmuxSocketPath(["CMUX_SOCKET_PATH": "/tmp/explicit.sock"], appSupportDirectory: temp)
+
+        XCTAssertEqual(p, "/tmp/explicit.sock")
+    }
+
     func testSocketPasswordEnvWins() throws {
         let temp = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: temp, withIntermediateDirectories: true)

@@ -26,4 +26,17 @@ final class CmuxConnectionTests: XCTestCase {
         XCTAssertEqual(resets, 0,
                        "no prior boot id, so the first observation cannot be a 'change'")
     }
+
+    func testSocketPathResolverIsDynamic() {
+        final class PathBox: @unchecked Sendable {
+            var path: String
+            init(_ path: String) { self.path = path }
+        }
+        let box = PathBox("/tmp/cmux-a.sock")
+        let conn = CmuxConnection(socketPathResolver: { box.path })
+
+        XCTAssertEqual(conn.socketPath, "/tmp/cmux-a.sock")
+        box.path = "/tmp/cmux-b.sock"
+        XCTAssertEqual(conn.socketPath, "/tmp/cmux-b.sock")
+    }
 }

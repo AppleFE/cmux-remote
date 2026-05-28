@@ -41,7 +41,7 @@ struct Serve: AsyncParsableCommand {
         try store.reload()
 
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 2)
-        let conn = CmuxConnection(socketPath: cmuxSocketPath(), group: group)
+        let conn = CmuxConnection(group: group)
         let facade = CMUXFacadeImpl(connection: conn)
         let reader = CmuxSurfaceReader(connection: conn)
         let manager = SessionManager(reader: reader,

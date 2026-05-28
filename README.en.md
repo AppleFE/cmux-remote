@@ -279,14 +279,20 @@ The relay reads `~/.cmuxremote/relay.json` (created by
 ```json
 {
   "listen":      "0.0.0.0:4399",
-  "cmux_socket": "/Users/<you>/Library/Application Support/cmux/cmux.sock",
-  "diff_hz":     15
+  "default_fps": 15,
+  "idle_fps":    5
 }
 ```
 
 `listen` is `0.0.0.0`, but non-Tailscale source addresses are refused
 at the application layer regardless. To allow localhost in dev, run
 the installer with `CMUX_DEV_ALLOW_LOCALHOST=1`.
+
+By default, the relay follows cmux's
+`~/Library/Application Support/cmux/last-socket-path` marker for the Unix
+socket. This keeps the relay from being pinned to a stale `cmux.sock` when
+cmux restarts with a socket name such as `cmux-501.sock`. Only set
+`CMUX_SOCKET_PATH=/path/to/socket` when you deliberately need a fixed socket.
 
 > **APNs key fields (`apns_team_id`, `apns_key_id`, `apns_key_path`)
 > are coming in v1.1.** Until then, cmux notifications are presented

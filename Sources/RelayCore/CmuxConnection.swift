@@ -13,25 +13,35 @@ import Logging
 /// Spec section 10. M3.15 wires the `onReset` callback into
 /// `SessionManager.broadcastReset()`.
 public final class CmuxConnection: @unchecked Sendable {
-    public let socketPath: String
+    public var socketPath: String { socketPathResolver() }
     public let group: EventLoopGroup
     public var onReset: (() -> Void)?
 
     private let logger = Logger(label: "CmuxConnection")
+    private let socketPathResolver: @Sendable () -> String
     private let socketPassword: String?
     private var lastBootId: String?
     private let dispatchResource: ReconnectingResource<CMUXClient>
     private let eventsResource: ReconnectingResource<CMUXClient>
 
-    public init(socketPath: String = cmuxSocketPath(),
+    public init(socketPath: String? = nil,
+                socketPathResolver: (@Sendable () -> String)? = nil,
                 group: EventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1),
                 socketPassword: String? = cmuxSocketPassword())
     {
-        self.socketPath = socketPath
+        let resolver: @Sendable () -> String
+        if let socketPath {
+            resolver = { socketPath }
+        } else if let socketPathResolver {
+            resolver = socketPathResolver
+        } else {
+            resolver = { cmuxSocketPath() }
+        }
+        self.socketPathResolver = resolver
         self.group = group
         self.socketPassword = socketPassword
         let opener: @Sendable () async throws -> CMUXClient = {
-            try await CmuxConnection.openClient(socketPath: socketPath,
+            try await CmuxConnection.openClient(socketPath: resolver(),
                                                 group: group,
                                                 socketPassword: socketPassword)
         }
