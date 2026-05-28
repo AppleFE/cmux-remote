@@ -343,6 +343,6 @@ App previews (video): not required for v1.0.
 - [ ] Screenshots uploaded for at least 6.9"
 - [ ] In-App Purchases: none (v1.0)
 - [x] Build archived with Release config + Distribution provisioning profile for v1.0.3 build 4
-- [ ] Build uploaded via Xcode → Organizer → Distribute App → App Store Connect
+- [x] Build uploaded via altool → App Store Connect
 - [ ] TestFlight internal test passes (recommended before public submit)
 - [ ] Submit for Review
