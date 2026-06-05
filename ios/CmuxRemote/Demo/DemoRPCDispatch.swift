@@ -29,11 +29,18 @@ public actor DemoRPCDispatch: RPCDispatch {
         case "workspace.list":
             return RPCResponse(id: "demo", result: .object([
                 "workspaces": .array(workspaces.enumerated().map { index, ws in
-                    .object([
+                    var payload: [String: JSONValue] = [
                         "id": .string(ws.id),
                         "title": .string(ws.title),
                         "index": .int(Int64(index)),
-                    ])
+                    ]
+                    if ws.id == "WS-DEMO-1" {
+                        payload["agent"] = .string("Claude Code")
+                        payload["status"] = .string("Claude is waiting for your input")
+                        payload["summary"] = .string("Claude needs your permission")
+                        payload["active_surface_id"] = .string("SF-DEMO-1A")
+                    }
+                    return .object(payload)
                 }),
             ]))
 

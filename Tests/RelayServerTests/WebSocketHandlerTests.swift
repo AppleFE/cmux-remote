@@ -92,6 +92,18 @@ final class WebSocketHandlerTests: XCTestCase {
         XCTAssertEqual(actions, [.subscribe(responseId: "9", workspaceId: "w", surfaceId: "s", lines: 200)])
     }
 
+    func testSurfaceSubscribeUsesRequestedLineCount() async {
+        let cmux = RecordingCMUXFacade()
+        let m = WSProtocolMachine(cmux: cmux)
+        _ = await m.processText(#"{"deviceId":"d","appVersion":"1","protocolVersion":1}"#)
+
+        let actions = await m.processText(#"{"id":"9","method":"surface.subscribe","params":{"workspace_id":"w","surface_id":"s","fps":15,"lines":120}}"#)
+
+        let calls = await cmux.snapshot()
+        XCTAssertEqual(calls, [])
+        XCTAssertEqual(actions, [.subscribe(responseId: "9", workspaceId: "w", surfaceId: "s", lines: 120)])
+    }
+
     func testSurfaceUnsubscribeBecomesRelayActionWithoutCmuxDispatch() async {
         let cmux = RecordingCMUXFacade()
         let m = WSProtocolMachine(cmux: cmux)

@@ -5,6 +5,8 @@ import SharedKit
 @MainActor
 @Observable
 public final class SurfaceStore {
+    public static let defaultSubscriptionLines = 120
+
     public var grid: CellGrid = CellGrid(cols: 80, rows: 24)
     public var rev: Int = 0
     public var subscribed: String?
@@ -29,6 +31,7 @@ public final class SurfaceStore {
                 "workspace_id": .string(workspaceId),
                 "surface_id": .string(surfaceId),
                 "fps": .int(15),
+                "lines": .int(Int64(Self.defaultSubscriptionLines)),
             ])
         )
         await focusCurrentSurface()
@@ -43,6 +46,7 @@ public final class SurfaceStore {
                 "workspace_id": .string(workspaceId),
                 "surface_id": .string(surfaceId),
                 "fps": .int(15),
+                "lines": .int(Int64(Self.defaultSubscriptionLines)),
             ])
         )
         await focusCurrentSurface()
@@ -223,7 +227,7 @@ public final class SurfaceStore {
             params: .object([
                 "workspace_id": .string(workspaceId),
                 "surface_id": .string(surfaceId),
-                "lines": .int(Int64(max(grid.rows.count, 1))),
+                "lines": .int(Int64(max(grid.rawRows.count, Self.defaultSubscriptionLines))),
             ])
         ),
         let payload = try? response.unwrapResult().decode(ReadTextPayload.self)
@@ -239,7 +243,7 @@ public final class SurfaceStore {
     private func currentScreen() -> Screen {
         Screen(
             rev: rev,
-            rows: grid.rows.map { row in row.map { String($0.character) }.joined() },
+            rows: grid.rawRows,
             cols: grid.cols,
             cursor: grid.cursor
         )

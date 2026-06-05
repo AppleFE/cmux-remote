@@ -135,6 +135,7 @@ struct CmuxRemoteApp: App {
         let liveSurfaceStore = SurfaceStore(rpc: rpc)
         let liveHostStatusStore = HostStatusStore(rpc: rpc)
         await MainActor.run {
+            liveWorkspaceStore.onWorkspaceAlert = { notifStore.append($0) }
             workspaceStore = liveWorkspaceStore
             surfaceStore = liveSurfaceStore
             hostStatusStore = liveHostStatusStore
@@ -155,7 +156,8 @@ struct CmuxRemoteApp: App {
         }
         await ws.setOnOpen {
             Task {
-                let hello = HelloFrame(deviceId: deviceId, appVersion: "1.0.0", protocolVersion: 1)
+                let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.4"
+                let hello = HelloFrame(deviceId: deviceId, appVersion: appVersion, protocolVersion: 1)
                 if let data = try? SharedKitJSON.deterministicEncoder.encode(hello),
                    let text = String(data: data, encoding: .utf8)
                 {
@@ -184,6 +186,7 @@ struct CmuxRemoteApp: App {
         let liveWorkspaceStore = WorkspaceStore(rpc: rpc)
         let liveSurfaceStore = SurfaceStore(rpc: rpc)
         let liveHostStatusStore = HostStatusStore(rpc: rpc)
+        liveWorkspaceStore.onWorkspaceAlert = { notifStore.append($0) }
         workspaceStore = liveWorkspaceStore
         surfaceStore = liveSurfaceStore
         hostStatusStore = liveHostStatusStore

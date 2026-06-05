@@ -13,6 +13,33 @@ final class StoresTests: XCTestCase {
         XCTAssertEqual(store.connection, .connected)
     }
 
+
+    func testWorkspaceRefreshEmitsClaudeCodeNeedsInputAlertFromWorkspaceListStatus() async {
+        let rpc = StubRPCDispatch(
+            workspaces: [("w1", "말겨봐")],
+            workspaceExtras: [
+                "w1": [
+                    "agent": .string("Claude Code"),
+                    "status": .string("Claude is waiting for your input"),
+                    "summary": .string("Claude needs your permission"),
+                    "active_surface_id": .string("s1"),
+                ],
+            ]
+        )
+        let store = WorkspaceStore(rpc: rpc)
+        var alerts: [NotificationRecord] = []
+        store.onWorkspaceAlert = { alerts.append($0) }
+
+        await store.refresh()
+
+        XCTAssertEqual(alerts.count, 1)
+        XCTAssertEqual(alerts.first?.workspaceId, "w1")
+        XCTAssertEqual(alerts.first?.surfaceId, "s1")
+        XCTAssertEqual(alerts.first?.title, "Claude Code needs input")
+        XCTAssertEqual(alerts.first?.body, "Claude is waiting for your input")
+        XCTAssertTrue(alerts.first?.id.contains("workspace-alert") ?? false)
+    }
+
     func testEndpointPolicyAllowsOnlyTailscaleScopedHosts() {
         XCTAssertTrue(EndpointPolicy.isAllowedRelayHost("mac.tailnet.ts.net"))
         XCTAssertTrue(EndpointPolicy.isAllowedRelayHost("100.115.102.6"))
@@ -132,6 +159,54 @@ final class StoresTests: XCTestCase {
         surfaceStore.reset()
         XCTAssertNil(surfaceStore.subscribed)
         XCTAssertEqual(surfaceStore.grid.rows.count, 24)
+    }
+
+    func testSurfaceSubscribeRequestsBoundedTerminalHistory() async {
+        let rpc = StubRPCDispatch()
+        let surfaceStore = SurfaceStore(rpc: rpc)
+
+        await surfaceStore.subscribe(workspaceId: "w1", surfaceId: "s1")
+
+        let calls = await rpc.calls
+        XCTAssertTrue(calls.contains { call in
+            guard call.method == "surface.subscribe",
+                  case .object(let params) = call.params,
+                  case .int(let lines)? = params["lines"]
+            else { return false }
+            return lines == Int64(SurfaceStore.defaultSubscriptionLines)
+        })
+        XCTAssertTrue(calls.contains { call in
+            guard call.method == "surface.read_text",
+                  case .object(let params) = call.params,
+                  case .int(let lines)? = params["lines"]
+            else { return false }
+            return lines == Int64(SurfaceStore.defaultSubscriptionLines)
+        })
+    }
+
+    func testSurfaceResubscribeRequestsBoundedTerminalHistory() async {
+        let rpc = StubRPCDispatch()
+        let surfaceStore = SurfaceStore(rpc: rpc)
+        surfaceStore.subscribedWorkspaceId = "w1"
+        surfaceStore.subscribed = "s1"
+
+        await surfaceStore.resubscribe()
+
+        let calls = await rpc.calls
+        XCTAssertTrue(calls.contains { call in
+            guard call.method == "surface.subscribe",
+                  case .object(let params) = call.params,
+                  case .int(let lines)? = params["lines"]
+            else { return false }
+            return lines == Int64(SurfaceStore.defaultSubscriptionLines)
+        })
+        XCTAssertTrue(calls.contains { call in
+            guard call.method == "surface.read_text",
+                  case .object(let params) = call.params,
+                  case .int(let lines)? = params["lines"]
+            else { return false }
+            return lines == Int64(SurfaceStore.defaultSubscriptionLines)
+        })
     }
 
     func testSurfaceStoreSendsTextAndKeys() async throws {
@@ -372,6 +447,63 @@ final class StoresTests: XCTestCase {
         XCTAssertEqual(store.items.first?.surfaceId, "s2")
         XCTAssertEqual(store.items.first?.title, "Claude Code needs input")
         XCTAssertEqual(store.items.first?.body, "Claude Code needs your attention")
+    }
+
+    func testNotificationStoreIngestsCodexHookPermissionPromptEvent() {
+        let store = NotificationStore()
+        let frame = PushFrame.event(EventFrame(
+            category: .hook,
+            name: "codex.permission_prompt",
+            payload: .object([
+                "workspace_id": .string("w3"),
+                "surface_id": .string("s3"),
+                "source": .string("Codex"),
+                "message": .string("approval required"),
+            ])
+        ))
+
+        store.ingest(frame)
+
+        XCTAssertEqual(store.items.count, 1)
+        XCTAssertEqual(store.items.first?.workspaceId, "w3")
+        XCTAssertEqual(store.items.first?.surfaceId, "s3")
+        XCTAssertEqual(store.items.first?.title, "Codex needs input")
+        XCTAssertEqual(store.items.first?.body, "approval required")
+    }
+
+    func testNotificationStoreDoesNotAlarmGenericApprovalNoise() {
+        let store = NotificationStore()
+        let frame = PushFrame.event(EventFrame(
+            category: .workspace,
+            name: "workspace.updated",
+            payload: .object([
+                "workspace_id": .string("w4"),
+                "source": .string("billing"),
+                "message": .string("approval required"),
+            ])
+        ))
+
+        store.ingest(frame)
+
+        XCTAssertTrue(store.items.isEmpty)
+    }
+
+    func testNotificationStoreLabelsUnknownHookNeedsInputAsCmuxHook() {
+        let store = NotificationStore()
+        let frame = PushFrame.event(EventFrame(
+            category: .hook,
+            name: "surface.needs-input",
+            payload: .object([
+                "workspace_id": .string("w5"),
+                "message": .string("needs input"),
+            ])
+        ))
+
+        store.ingest(frame)
+
+        XCTAssertEqual(store.items.count, 1)
+        XCTAssertEqual(store.items.first?.title, "cmux hook needs input")
+        XCTAssertEqual(store.items.first?.body, "needs input")
     }
 
     func testNotificationStoreFiresOnNewOnceForRepeatedId() {

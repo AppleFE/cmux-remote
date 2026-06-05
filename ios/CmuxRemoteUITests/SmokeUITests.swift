@@ -114,6 +114,13 @@ final class SmokeUITests: XCTestCase {
         XCTAssertTrue(commandField.waitForExistence(timeout: 5))
         let idleScrollButton = app.buttons["TerminalScrollToBottomButton"]
         XCTAssertTrue(idleScrollButton.exists)
+        let idleAccessory = app.otherElements["TerminalAccessoryPanel"]
+        XCTAssertTrue(idleAccessory.waitForExistence(timeout: 5))
+        XCTAssertLessThanOrEqual(
+            app.frame.maxY - idleAccessory.frame.maxY,
+            4,
+            "Input accessory should sit flush with the bottom edge when the keyboard is hidden"
+        )
         XCTAssertGreaterThan(
             viewport.frame.height,
             app.frame.height * 0.32,
@@ -125,7 +132,6 @@ final class SmokeUITests: XCTestCase {
         XCTAssertTrue(keyboard.waitForExistence(timeout: 5), "Software keyboard must be visible for keyboard-overlap regression coverage")
         commandField.typeText("x")
         let keyboardTop = keyboard.frame.minY
-
         assertAboveKeyboard(commandField, keyboardTop: keyboardTop, name: "command field")
         assertAboveKeyboard(app.buttons["CommandKeyboardDismissButton"], keyboardTop: keyboardTop, name: "keyboard dismiss")
         assertAboveKeyboard(app.buttons["CommandBackspaceButton"], keyboardTop: keyboardTop, name: "backspace")
@@ -144,6 +150,45 @@ final class SmokeUITests: XCTestCase {
 
         scrollButton.tap()
         XCTAssertTrue(keyboard.exists, "Scroll-to-bottom must not steal focus or toggle the software keyboard")
+    }
+
+
+    func testInboxShowsClaudeCodeNeedsInputFromWorkspaceStatus() throws {
+        let app = launchFakeRelayApp()
+
+        let inboxTab = app.buttons["Inbox"]
+        XCTAssertTrue(inboxTab.waitForExistence(timeout: 5))
+        inboxTab.tap()
+
+        let title = app.staticTexts["Claude Code needs input"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["Claude is waiting for your input"].exists)
+    }
+
+    func testLiveInputModeSendsCharactersWithoutSubmit() throws {
+        let app = launchFakeRelayApp()
+
+        let workspace = primaryWorkspaceButton(in: app)
+        XCTAssertTrue(workspace.waitForExistence(timeout: 5))
+        workspace.tap()
+
+        let modeToggle = app.buttons["InputModeToggleButton"]
+        XCTAssertTrue(modeToggle.waitForExistence(timeout: 5))
+        modeToggle.tap()
+
+        let liveTextView = app.textViews["LiveInputField"]
+        let liveField = liveTextView.waitForExistence(timeout: 3)
+            ? liveTextView
+            : app.textFields["LiveInputField"]
+        XCTAssertTrue(liveField.waitForExistence(timeout: 5))
+        liveField.tap()
+        liveField.typeText("a")
+
+        XCTAssertTrue(liveField.valueDescription.contains("a"), liveField.valueDescription)
+
+        let inputStatus = app.staticTexts["InputStatusMessage"]
+        XCTAssertTrue(inputStatus.waitForExistence(timeout: 5))
+        XCTAssertTrue(inputStatus.label.contains("Sent a"), inputStatus.label)
     }
 
     private func launchFakeRelayApp() -> XCUIApplication {

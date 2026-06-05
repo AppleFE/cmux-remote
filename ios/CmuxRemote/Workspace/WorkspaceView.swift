@@ -18,6 +18,9 @@ struct WorkspaceView: View {
     @State private var activeWorkspaceId: String?
     @State private var activeSurfaceId: String?
     @State private var composer = CommandComposer()
+    @State private var inputMode: TerminalInputMode = .command
+    @State private var liveInputFocused = false
+    @State private var liveInputEcho = ""
     @State private var headerHeight: CGFloat = 128
     @State private var accessoryHeight: CGFloat = 172
     @State private var keyboardHeight: CGFloat = 0
@@ -33,10 +36,10 @@ struct WorkspaceView: View {
     var body: some View {
         GeometryReader { proxy in
             let keyboardVisible = keyboardHeight > proxy.safeAreaInsets.bottom + 20
-            let keyboardControlsActive = keyboardVisible || commandFieldFocused
+            let keyboardControlsActive = keyboardVisible || commandFieldFocused || liveInputFocused
             let keyboardAccessoryOffset: CGFloat = keyboardControlsActive ? -112 : 0
             let bottomObstruction = keyboardVisible ? 0 : proxy.safeAreaInsets.bottom
-            let accessoryBottomPadding = bottomObstruction + keyboardAccessoryOffset + 12
+            let accessoryBottomPadding: CGFloat = keyboardVisible ? keyboardAccessoryOffset + 12 : 0
             let terminalBottomInset = max(0, accessoryHeight + keyboardAccessoryOffset + 10)
             let terminalTopInset = keyboardControlsActive
                 ? proxy.safeAreaInsets.top + 20
@@ -259,21 +262,69 @@ struct WorkspaceView: View {
         VStack(spacing: 10) {
             HStack(alignment: .top, spacing: 8) {
                 HStack(spacing: 8) {
+                    Button {
+                        toggleInputMode()
+                    } label: {
+                        Text(inputMode.label)
+                            .cmuxDisplay(10)
+                            .foregroundStyle(inputMode == .live ? CmuxTheme.canvas : CmuxTheme.accentGreen)
+                            .frame(width: 42, height: 26)
+                            .background(inputMode == .live ? CmuxTheme.accentGreen : CmuxTheme.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                    .strokeBorder(CmuxTheme.divider, lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("InputModeToggleButton")
+                    .accessibilityLabel(inputMode == .live ? "Switch to command input mode" : "Switch to live input mode")
+
                     Text("$")
                         .cmuxDisplay(14)
                         .foregroundStyle(CmuxTheme.accentGreen)
-                    TextField("type a command…", text: $composer.draft, axis: .vertical)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .focused($commandFieldFocused)
-                        .cmuxMono(14)
-                        .foregroundStyle(CmuxTheme.ink)
-                        .submitLabel(.send)
-                        .lineLimit(1...3)
-                        .disabled(composer.isSending)
-                        .onSubmit { submitCommand() }
-                        .onTapGesture { commandFieldFocused = true }
-                        .accessibilityIdentifier("CommandComposerField")
+
+                    if inputMode == .command {
+                        TextField("type a command…", text: $composer.draft, axis: .vertical)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .focused($commandFieldFocused)
+                            .cmuxMono(14)
+                            .foregroundStyle(CmuxTheme.ink)
+                            .submitLabel(.send)
+                            .lineLimit(1...3)
+                            .disabled(composer.isSending)
+                            .onSubmit { submitCommand() }
+                            .onTapGesture { commandFieldFocused = true }
+                            .accessibilityIdentifier("CommandComposerField")
+                    } else {
+                        ZStack(alignment: .leading) {
+                            LiveTerminalInputView(
+                                displayText: liveInputEcho,
+                                isFocused: $liveInputFocused,
+                                onText: { text in
+                                    rememberLiveInputText(text)
+                                    sendText(text)
+                                },
+                                onKey: { key in
+                                    rememberLiveInputKey(key)
+                                    sendKey(key)
+                                }
+                            )
+                            .accessibilityIdentifier("LiveInputField")
+                            .accessibilityLabel("Live terminal input")
+
+                            if liveInputEcho.isEmpty {
+                                Text("입력하면 바로 전송됩니다…")
+                                    .cmuxMono(14)
+                                    .foregroundStyle(CmuxTheme.muted)
+                                    .lineLimit(1)
+                                    .allowsHitTesting(false)
+                                    .accessibilityIdentifier("LiveInputPlaceholder")
+                            }
+                        }
+                        .frame(minHeight: 26, maxHeight: 34)
+                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
@@ -361,11 +412,30 @@ struct WorkspaceView: View {
                 .strokeBorder(CmuxTheme.divider, lineWidth: 1)
         }
         .shadow(color: CmuxTheme.hardShadow, radius: 20, x: 0, y: 10)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("TerminalAccessoryPanel")
     }
 
     private func dismissKeyboard() {
         commandFieldFocused = false
+        liveInputFocused = false
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+
+    private func toggleInputMode() {
+        switch inputMode {
+        case .command:
+            inputMode = .live
+            composer.draft = ""
+            liveInputEcho = ""
+            commandFieldFocused = false
+            liveInputFocused = true
+        case .live:
+            inputMode = .command
+            liveInputEcho = ""
+            liveInputFocused = false
+            commandFieldFocused = true
+        }
     }
 
     private func pasteClipboard() {
@@ -439,6 +509,32 @@ struct WorkspaceView: View {
             } catch {
                 await MainActor.run { composer.failSubmit(error) }
             }
+        }
+    }
+
+    private func rememberLiveInputText(_ text: String) {
+        guard inputMode == .live, !text.isEmpty else { return }
+        let visible = text.replacingOccurrences(of: " ", with: "␠")
+        liveInputEcho = String((liveInputEcho + visible).suffix(48))
+    }
+
+    private func rememberLiveInputKey(_ key: Key) {
+        guard inputMode == .live else { return }
+        switch key {
+        case .backspace:
+            if !liveInputEcho.isEmpty {
+                liveInputEcho.removeLast()
+            } else {
+                liveInputEcho = "⌫"
+            }
+        case .enter:
+            liveInputEcho = "↵"
+        case .tab:
+            liveInputEcho = String((liveInputEcho + "⇥").suffix(48))
+        case .esc:
+            liveInputEcho = "esc"
+        default:
+            liveInputEcho = KeyEncoder.encode(key)
         }
     }
 
@@ -908,6 +1004,131 @@ private extension UIImage {
         format.scale = 1
         return UIGraphicsImageRenderer(size: targetSize, format: format).image { _ in
             draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+    }
+}
+
+
+private enum TerminalInputMode: Equatable {
+    case command
+    case live
+
+    var label: String {
+        switch self {
+        case .command: return "CMD"
+        case .live: return "LIVE"
+        }
+    }
+}
+
+private struct LiveTerminalInputView: UIViewRepresentable {
+    var displayText: String
+    @Binding var isFocused: Bool
+    var onText: (String) -> Void
+    var onKey: (Key) -> Void
+
+    func makeUIView(context: Context) -> LiveTerminalTextView {
+        let view = LiveTerminalTextView()
+        view.delegate = context.coordinator
+        view.backgroundColor = .clear
+        view.textColor = UIColor(CmuxTheme.ink)
+        view.tintColor = UIColor(CmuxTheme.accentGreen)
+        view.font = UIFont(name: "GeistMono-Regular", size: 14) ?? UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+        view.autocorrectionType = .no
+        view.autocapitalizationType = .none
+        view.smartDashesType = .no
+        view.smartQuotesType = .no
+        view.smartInsertDeleteType = .no
+        view.keyboardType = .default
+        view.returnKeyType = .default
+        view.textContainerInset = UIEdgeInsets(top: 4, left: 0, bottom: 0, right: 0)
+        view.textContainer.lineFragmentPadding = 0
+        view.isScrollEnabled = false
+        view.accessibilityIdentifier = "LiveInputField"
+        view.accessibilityLabel = "Live terminal input"
+        return view
+    }
+
+    func updateUIView(_ uiView: LiveTerminalTextView, context: Context) {
+        context.coordinator.parent = self
+        uiView.accessibilityIdentifier = "LiveInputField"
+        uiView.accessibilityLabel = "Live terminal input"
+        let currentText = uiView.text ?? ""
+        let hasLocalHangulInput = LiveTerminalInputTranslator.containsHangul(currentText)
+        uiView.accessibilityValue = hasLocalHangulInput ? currentText : displayText
+        if !hasLocalHangulInput, uiView.text != displayText {
+            uiView.text = displayText
+        }
+        if !hasLocalHangulInput {
+            uiView.selectedRange = NSRange(location: (uiView.text as NSString).length, length: 0)
+        }
+        uiView.onDeleteWhenEmpty = { [weak coordinator = context.coordinator] in
+            coordinator?.handle(actions: LiveTerminalInputTranslator.interpretDeletion())
+        }
+        if isFocused, !uiView.isFirstResponder {
+            uiView.becomeFirstResponder()
+        } else if !isFocused, uiView.isFirstResponder {
+            uiView.resignFirstResponder()
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        var parent: LiveTerminalInputView
+
+        init(parent: LiveTerminalInputView) {
+            self.parent = parent
+        }
+
+        func textViewDidBeginEditing(_ textView: UITextView) {
+            parent.isFocused = true
+        }
+
+        func textViewDidEndEditing(_ textView: UITextView) {
+            parent.isFocused = false
+        }
+
+        func textView(
+            _ textView: UITextView,
+            shouldChangeTextIn range: NSRange,
+            replacementText text: String
+        ) -> Bool {
+            if LiveTerminalInputTranslator.shouldUseLocalEditing(
+                currentText: textView.text ?? "",
+                replacementText: text
+            ) {
+                return true
+            }
+            if text.isEmpty, range.length > 0 {
+                handle(actions: LiveTerminalInputTranslator.interpretDeletion(count: range.length))
+            } else {
+                handle(actions: LiveTerminalInputTranslator.interpret(replacementText: text))
+            }
+            return false
+        }
+
+        func handle(actions: [LiveTerminalInputAction]) {
+            for action in actions {
+                switch action {
+                case .text(let text): parent.onText(text)
+                case .key(let key): parent.onKey(key)
+                }
+            }
+        }
+    }
+}
+
+private final class LiveTerminalTextView: UITextView {
+    var onDeleteWhenEmpty: (() -> Void)?
+
+    override func deleteBackward() {
+        if text.isEmpty {
+            onDeleteWhenEmpty?()
+        } else {
+            super.deleteBackward()
         }
     }
 }

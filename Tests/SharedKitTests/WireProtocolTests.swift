@@ -45,9 +45,31 @@ struct WireProtocolTests {
         #expect(f.name == "notification.created")
     }
 
-    @Test func eventFrameDecodesUnknownCategoryAsUnknown() throws {
+    @Test func eventFrameDecodesAgentCategoryForNeedsInputEvents() throws {
         let raw = """
         {"type":"event","category":"agent","name":"claude.needs_input","payload":{"status":"needs input"}}
+        """
+        let frame = try JSONDecoder().decode(PushFrame.self, from: Data(raw.utf8))
+        guard case .event(let f) = frame else { Issue.record("wrong"); return }
+        #expect(f.category == .agent)
+        #expect(f.name == "claude.needs_input")
+        #expect(EventCategory.allCases.contains(.agent))
+    }
+
+    @Test func eventFrameDecodesHookCategoryForNeedsInputEvents() throws {
+        let raw = """
+        {"type":"event","category":"hook","name":"claude.hook.needs_input","payload":{"status":"needs input"}}
+        """
+        let frame = try JSONDecoder().decode(PushFrame.self, from: Data(raw.utf8))
+        guard case .event(let f) = frame else { Issue.record("wrong"); return }
+        #expect(f.category == .hook)
+        #expect(f.name == "claude.hook.needs_input")
+        #expect(EventCategory.allCases.contains(.hook))
+    }
+
+    @Test func eventFrameDecodesUnknownCategoryAsUnknown() throws {
+        let raw = """
+        {"type":"event","category":"mystery","name":"claude.needs_input","payload":{"status":"needs input"}}
         """
         let frame = try JSONDecoder().decode(PushFrame.self, from: Data(raw.utf8))
         guard case .event(let f) = frame else { Issue.record("wrong"); return }

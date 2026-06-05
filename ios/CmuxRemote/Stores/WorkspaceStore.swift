@@ -9,8 +9,10 @@ public final class WorkspaceStore {
     public var selectedId: String?
     public var surfacesByWorkspaceId: [String: [Surface]] = [:]
     public var connection: ConnectionState = .disconnected
+    public var onWorkspaceAlert: (@MainActor (NotificationRecord) -> Void)?
 
     private let rpc: any RPCDispatch
+    private var seenWorkspaceAlertIds: Set<String> = []
 
     public init(rpc: any RPCDispatch) {
         self.rpc = rpc
@@ -23,6 +25,7 @@ public final class WorkspaceStore {
             let payload = try response.unwrapResult().decode(WorkspaceListPayload.self)
             let loaded = payload.workspaces.map(\.model).sorted { $0.index < $1.index }
             workspaces = loaded
+            publishWorkspaceAlerts(from: payload.workspaces)
             if selectedId == nil || !loaded.contains(where: { $0.id == selectedId }) {
                 selectedId = loaded.first?.id
             }
@@ -117,6 +120,16 @@ public final class WorkspaceStore {
         selectedId = nil
         surfacesByWorkspaceId = [:]
         connection = .disconnected
+        seenWorkspaceAlertIds = []
+    }
+
+    private func publishWorkspaceAlerts(from payloads: [WorkspacePayload]) {
+        guard let onWorkspaceAlert else { return }
+        for payload in payloads {
+            guard let notification = payload.needsInputNotification else { continue }
+            guard seenWorkspaceAlertIds.insert(notification.id).inserted else { continue }
+            onWorkspaceAlert(notification)
+        }
     }
 }
 

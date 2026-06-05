@@ -4,6 +4,34 @@ import SharedKit
 @testable import CMUXClient
 
 final class EventStreamTests: XCTestCase {
+    func testAllCasesRequestIncludesAgentAndHookButNotUnknown() async throws {
+        let fix = try await MTELGCmuxFixture.make(requestTimeout: .seconds(2))
+        defer { Task { await fix.shutdown() } }
+
+        let stream = EventStream(client: fix.client) { _ in }
+
+        async let startTask = stream.start(categories: EventCategory.allCases)
+
+        let outString = try await fix.awaitRequestLine()
+        XCTAssertTrue(outString.contains("\"workspace\""), outString)
+        XCTAssertTrue(outString.contains("\"surface\""), outString)
+        XCTAssertTrue(outString.contains("\"notification\""), outString)
+        XCTAssertTrue(outString.contains("\"system\""), outString)
+        XCTAssertTrue(outString.contains("\"agent\""), outString)
+        XCTAssertTrue(outString.contains("\"hook\""), outString)
+        XCTAssertFalse(outString.contains("\"unknown\""), outString)
+
+        let pattern = #"\"id\":\"([^\"]+)\""#
+        let regex = try NSRegularExpression(pattern: pattern)
+        let match = try XCTUnwrap(
+            regex.firstMatch(in: outString, range: NSRange(outString.startIndex..., in: outString)),
+            "no id in: \(outString)")
+        let outId = String(outString[Range(match.range(at: 1), in: outString)!])
+        try await fix.sendToClient(line: #"{"id":"\#(outId)","result":null}"#)
+
+        _ = await startTask
+    }
+
     func testForwardsEvents() async throws {
         let fix = try await MTELGCmuxFixture.make(requestTimeout: .seconds(2))
         defer { Task { await fix.shutdown() } }

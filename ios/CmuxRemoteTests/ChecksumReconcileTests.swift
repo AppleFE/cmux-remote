@@ -16,19 +16,46 @@ final class ChecksumReconcileTests: XCTestCase {
         let calls = await rpc.calls
         XCTAssertTrue(calls.contains { $0.method == "surface.read_text" })
     }
+
+    func testMatchingChecksumUsesRawAnsiRowsAndAvoidsFullRequest() async {
+        let rpc = StubRPCDispatch()
+        let store = SurfaceStore(rpc: rpc)
+        store.subscribed = "s"
+        store.subscribedWorkspaceId = "w"
+        let rows = ["\u{1B}[38;5;202mhot\u{1B}[0m", "plain"]
+        let cursor = CursorPos(x: 1, y: 0)
+        store.ingest(.screenFull(ScreenFull(
+            surfaceId: "s",
+            rev: 2,
+            rows: rows,
+            cols: 5,
+            rowsCount: rows.count,
+            cursor: cursor
+        )))
+
+        let hash = ScreenHasher.hash(Screen(rev: 2, rows: rows, cols: 5, cursor: cursor))
+        store.ingest(.screenChecksum(ScreenChecksum(surfaceId: "s", rev: 2, hash: hash)))
+
+        try? await Task.sleep(nanoseconds: 30_000_000)
+        let calls = await rpc.calls
+        XCTAssertFalse(calls.contains { $0.method == "surface.read_text" })
+    }
 }
 
 actor StubRPCDispatch: RPCDispatch {
     private(set) var calls: [(method: String, params: JSONValue)] = []
     private var workspaces: [(id: String, title: String)]
     private var surfaces: [(id: String, title: String)]
+    private var workspaceExtras: [String: [String: JSONValue]]
 
     init(
         workspaces: [(String, String)] = [("w1", "Demo")],
-        surfaces: [(String, String)] = [("s1", "shell")]
+        surfaces: [(String, String)] = [("s1", "shell")],
+        workspaceExtras: [String: [String: JSONValue]] = [:]
     ) {
         self.workspaces = workspaces.map { (id: $0.0, title: $0.1) }
         self.surfaces = surfaces.map { (id: $0.0, title: $0.1) }
+        self.workspaceExtras = workspaceExtras
     }
 
     func call(method: String, params: JSONValue) async throws -> RPCResponse {
@@ -37,11 +64,15 @@ actor StubRPCDispatch: RPCDispatch {
         case "workspace.list":
             return RPCResponse(id: "stub", result: .object([
                 "workspaces": .array(workspaces.enumerated().map { index, workspace in
-                    .object([
+                    var payload: [String: JSONValue] = [
                         "id": .string(workspace.id),
                         "title": .string(workspace.title),
                         "index": .int(Int64(index)),
-                    ])
+                    ]
+                    for (key, value) in workspaceExtras[workspace.id] ?? [:] {
+                        payload[key] = value
+                    }
+                    return .object(payload)
                 })
             ]))
         case "workspace.create":

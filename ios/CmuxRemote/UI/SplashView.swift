@@ -10,16 +10,25 @@ struct SplashView: View {
     @State private var caretOn = true
     @State private var prepareDissolve = false
 
-    private static let lines: [SplashLine] = [
-        .init(prefix: "▓▓▓▓▓▓", body: " CMUX REMOTE ", suffix: "▓▓▓▓▓▓", style: .banner),
-        .init(prefix: "",  body: "v1.0.0  build 1",            suffix: "", style: .meta),
-        .init(prefix: "",  body: "─────────────────────────",  suffix: "", style: .divider),
-        .init(prefix: "[",  body: " ok ", suffix: "] swift runtime",        style: .stepOk),
-        .init(prefix: "[",  body: " ok ", suffix: "] keychain",             style: .stepOk),
-        .init(prefix: "[",  body: " ok ", suffix: "] tailscale resolver",   style: .stepOk),
-        .init(prefix: "[",  body: " ok ", suffix: "] websocket",            style: .stepOk),
-        .init(prefix: "[", body: " READY ", suffix: "]",                    style: .ready),
-    ]
+    private static var lines: [SplashLine] {
+        [
+            .init(prefix: "▓▓▓▓▓▓", body: " CMUX REMOTE ", suffix: "▓▓▓▓▓▓", style: .banner),
+            .init(prefix: "", body: appVersionText, suffix: "", style: .meta),
+            .init(prefix: "", body: "─────────────────────────", suffix: "", style: .divider),
+            .init(prefix: "[", body: " ok ", suffix: "] swift runtime", style: .stepOk),
+            .init(prefix: "[", body: " ok ", suffix: "] keychain", style: .stepOk),
+            .init(prefix: "[", body: " ok ", suffix: "] tailscale resolver", style: .stepOk),
+            .init(prefix: "[", body: " ok ", suffix: "] websocket", style: .stepOk),
+            .init(prefix: "[", body: " READY ", suffix: "]", style: .ready),
+        ]
+    }
+
+    private static var appVersionText: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "1.0.4"
+        let build = info?["CFBundleVersion"] as? String ?? "5"
+        return "v\(version)  build \(build)"
+    }
 
     private static let perLineDelay: Duration = .milliseconds(110)
     private static let postReadyDelay: Duration = .milliseconds(420)

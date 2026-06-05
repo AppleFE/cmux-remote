@@ -3,6 +3,8 @@ import Foundation
 public enum ANSIColor: Equatable {
     case `default`
     case red, green, yellow, blue, magenta, cyan, white, black
+    case indexed(Int)
+    case rgb(UInt8, UInt8, UInt8)
     indirect case bright(ANSIColor)
 }
 
@@ -58,7 +60,9 @@ public enum ANSIParser {
 
     private static func applySGR(_ attr: inout ANSIAttr, args: String) {
         let codes = args.isEmpty ? [0] : args.split(separator: ";").compactMap { Int($0) }
-        for code in codes {
+        var index = 0
+        while index < codes.count {
+            let code = codes[index]
             switch code {
             case 0: attr = .default
             case 1: attr.bold = true
@@ -70,8 +74,37 @@ public enum ANSIParser {
             case 40...47: attr.bg = color(for: code - 40)
             case 49: attr.bg = .default
             case 90...97: attr.fg = .bright(color(for: code - 90))
-            default: continue
+            case 100...107: attr.bg = .bright(color(for: code - 100))
+            case 38:
+                if let parsed = extendedColor(from: codes, start: index + 1) {
+                    attr.fg = parsed.color
+                    index = parsed.nextIndex
+                }
+            case 48:
+                if let parsed = extendedColor(from: codes, start: index + 1) {
+                    attr.bg = parsed.color
+                    index = parsed.nextIndex
+                }
+            default: break
             }
+            index += 1
+        }
+    }
+
+    private static func extendedColor(from codes: [Int], start: Int) -> (color: ANSIColor, nextIndex: Int)? {
+        guard start < codes.count else { return nil }
+        switch codes[start] {
+        case 5:
+            guard start + 1 < codes.count else { return nil }
+            return (.indexed(max(0, min(255, codes[start + 1]))), start + 1)
+        case 2:
+            guard start + 3 < codes.count else { return nil }
+            let r = UInt8(max(0, min(255, codes[start + 1])))
+            let g = UInt8(max(0, min(255, codes[start + 2])))
+            let b = UInt8(max(0, min(255, codes[start + 3])))
+            return (.rgb(r, g, b), start + 3)
+        default:
+            return nil
         }
     }
 

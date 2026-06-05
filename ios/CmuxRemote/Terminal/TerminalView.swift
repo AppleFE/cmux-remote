@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct TerminalView: View {
+    static let bottomScrollPaddingRows: CGFloat = 5
+
     @Bindable var store: SurfaceStore
     var topContentInset: CGFloat = 0
     var bottomContentInset: CGFloat = 0
@@ -13,6 +15,7 @@ struct TerminalView: View {
     var body: some View {
         GeometryReader { proxy in
             let lineHeight = fontSize + 2
+            let bottomScrollPadding = Self.bottomScrollPadding(lineHeight: lineHeight)
             let advance = fontSize * 0.6
             let leftInset: CGFloat = 16
             let topInset = max(0, topContentInset)
@@ -23,10 +26,10 @@ struct TerminalView: View {
                 viewportColumns,
                 store.grid.cols,
                 store.grid.cursor.x + 1,
-                store.grid.rows.map { TerminalCellWidth.columns(for: $0) }.max() ?? 0
+                store.grid.maxRenderedColumns
             )
             let contentWidth = max(proxy.size.width, leftInset + CGFloat(contentColumns) * advance + 24)
-            let contentHeight = max(viewportHeight + 1, CGFloat(store.grid.rows.count) * lineHeight + 24)
+            let contentHeight = max(viewportHeight + 1, CGFloat(store.grid.renderRows.count) * lineHeight + 24)
             let visibleCols = contentColumns
 
             ZStack(alignment: .top) {
@@ -40,27 +43,46 @@ struct TerminalView: View {
                         ScrollViewReader { verticalScroll in
                             ScrollView(.vertical, showsIndicators: false) {
                                 Canvas { context, _ in
-                                    for (y, row) in store.grid.rows.enumerated() {
-                                        var column = 0
-                                        for cell in row {
-                                            guard column < visibleCols else { break }
-                                            let cellColumns = TerminalCellWidth.columns(for: cell.character)
-                                            let drawColumn = cellColumns == 0 ? max(column - 1, 0) : column
+                                    for (y, row) in store.grid.renderRows.enumerated() {
+                                        let rowY = 8 + CGFloat(y) * lineHeight
+                                        for run in row.runs where run.startColumn < visibleCols {
+                                            guard run.attr.bg != .default, run.columns > 0 else { continue }
+                                            let x = leftInset + CGFloat(run.startColumn) * advance
+                                            let width = CGFloat(run.columns) * advance
+                                            context.fill(
+                                                Path(CGRect(x: x, y: rowY, width: width, height: lineHeight)),
+                                                with: .color(run.attr.bg.swiftUI)
+                                            )
+                                        }
+
+                                        for run in row.runs where run.startColumn < visibleCols {
                                             let point = CGPoint(
-                                                x: leftInset + CGFloat(drawColumn) * advance,
-                                                y: 8 + CGFloat(y) * lineHeight
+                                                x: leftInset + CGFloat(run.startColumn) * advance,
+                                                y: rowY
                                             )
                                             context.draw(
-                                                Text(TerminalGlyph.textStyleString(for: cell.character))
+                                                Text(run.text)
                                                     .font(CmuxFont.body(
                                                         fontSize,
-                                                        weight: cell.attr.bold ? .bold : .regular
+                                                        weight: run.attr.bold ? .bold : .regular
                                                     ))
-                                                    .foregroundStyle(cell.attr.fg.swiftUI),
+                                                    .foregroundStyle(run.attr.fg.swiftUI),
                                                 at: point,
                                                 anchor: .topLeading
                                             )
-                                            column += cellColumns
+                                            if run.attr.underline, run.columns > 0 {
+                                                let underlineY = rowY + lineHeight - 2
+                                                let width = CGFloat(run.columns) * advance
+                                                context.fill(
+                                                    Path(CGRect(
+                                                        x: point.x,
+                                                        y: underlineY,
+                                                        width: width,
+                                                        height: max(1, fontSize / 12)
+                                                    )),
+                                                    with: .color(run.attr.fg.swiftUI)
+                                                )
+                                            }
                                         }
                                     }
 
@@ -77,7 +99,7 @@ struct TerminalView: View {
                                 .cmuxScanlines()
 
                                 Color.clear
-                                    .frame(width: contentWidth, height: 1)
+                                    .frame(width: contentWidth, height: bottomScrollPadding)
                                     .id(TerminalScrollTarget.bottom)
                             }
                             .frame(width: contentWidth, height: viewportHeight)
@@ -115,10 +137,14 @@ struct TerminalView: View {
         .background(CmuxTheme.terminal)
     }
 
+    static func bottomScrollPadding(lineHeight: CGFloat) -> CGFloat {
+        lineHeight * bottomScrollPaddingRows
+    }
+
     private var accessibilitySnapshot: String {
-        store.grid.rows
+        store.grid.renderRows
             .prefix(6)
-            .map { row in row.map { String($0.character) }.joined().trimmingCharacters(in: .whitespaces) }
+            .map { $0.plainText.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
             .joined(separator: "\n")
     }
@@ -199,7 +225,51 @@ private extension ANSIColor {
         case .cyan:    return CmuxTheme.accentCyan
         case .white:   return CmuxTheme.terminalText
         case .black:   return CmuxTheme.mutedDim
+        case .indexed(let value): return Self.indexedColor(value)
+        case .rgb(let red, let green, let blue):
+            return Color(
+                red: Double(red) / 255.0,
+                green: Double(green) / 255.0,
+                blue: Double(blue) / 255.0
+            )
         case .bright(let inner): return inner.swiftUI
         }
+    }
+
+    static func indexedColor(_ value: Int) -> Color {
+        let clamped = max(0, min(255, value))
+        let system: [Color] = [
+            CmuxTheme.mutedDim,
+            CmuxTheme.accentRed,
+            CmuxTheme.accentGreen,
+            CmuxTheme.accentYellow,
+            CmuxTheme.accentBlue,
+            CmuxTheme.accentMagenta,
+            CmuxTheme.accentCyan,
+            CmuxTheme.terminalText,
+            CmuxTheme.muted,
+            CmuxTheme.accentRed.opacity(1.0),
+            CmuxTheme.accentGreen.opacity(1.0),
+            CmuxTheme.accentYellow.opacity(1.0),
+            CmuxTheme.accentBlue.opacity(1.0),
+            CmuxTheme.accentMagenta.opacity(1.0),
+            CmuxTheme.accentCyan.opacity(1.0),
+            Color.white,
+        ]
+        if clamped < system.count { return system[clamped] }
+        if clamped >= 232 {
+            let shade = Double(8 + (clamped - 232) * 10) / 255.0
+            return Color(red: shade, green: shade, blue: shade)
+        }
+        let cubeIndex = clamped - 16
+        let levels = [0, 95, 135, 175, 215, 255]
+        let red = levels[(cubeIndex / 36) % 6]
+        let green = levels[(cubeIndex / 6) % 6]
+        let blue = levels[cubeIndex % 6]
+        return Color(
+            red: Double(red) / 255.0,
+            green: Double(green) / 255.0,
+            blue: Double(blue) / 255.0
+        )
     }
 }

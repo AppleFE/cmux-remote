@@ -39,4 +39,11 @@ struct ModelsTests {
         let back = try JSONDecoder().decode(BootInfo.self, from: data)
         #expect(back == b)
     }
+
+    @Test func eventCategoriesIncludeAgentAndHookForNeedsInputSubscriptions() {
+        #expect(EventCategory.allCases.contains(.agent))
+        #expect(EventCategory.allCases.contains(.hook))
+        #expect(!EventCategory.allCases.contains(.unknown))
+    }
+
 }

@@ -1,4 +1,4 @@
-# App Store Connect — Metadata Draft (v1.0.3)
+# App Store Connect — Metadata Draft (v1.0.5)
 
 App: **Cmux Remote** · Bundle ID `com.genie.CmuxRemote` · Team `2UANJX7ATM`
 
@@ -85,7 +85,7 @@ The relay speaks directly to cmux's local Unix socket. This app speaks to the re
 
 FEATURES
 
-- Live mirror of cmux terminal surfaces with ANSI color and Korean / CJK width support
+- Performance-tuned live mirror of cmux terminal surfaces with Korean / CJK width support and ANSI colors when styled relay data is available
 - Full keyboard accessory bar — Esc, Enter, Tab, arrows, Ctrl combos, /new, and Space
 - Keyboard-safe composer layout with automatic keyboard dismissal after submit
 - Paste text from the mobile clipboard and attach photos; files are saved by the relay under Downloads/cmux-remote
@@ -191,7 +191,7 @@ cmux (https://cmux.com)는 native splits, 워크스페이스, Claude Code / Code
 
 주요 기능
 
-- ANSI 색상 + 한국어 / CJK 폭 처리 지원하는 cmux 터미널 surface 라이브 미러
+- 한국어 / CJK 폭 처리와 styled relay 데이터 제공 시 ANSI 색상을 지원하는 성능 최적화 cmux 터미널 surface 라이브 미러
 - 전용 키보드 액세서리 바 — Esc, Enter, Tab, 방향키, Ctrl 조합, /new, Space
 - 전송 후 키보드 자동 닫힘과 키보드 표시 중 안정적인 터미널/입력창 레이아웃
 - 모바일 클립보드 붙여넣기와 사진 첨부. 파일은 relay가 Downloads/cmux-remote 아래에 저장
@@ -224,26 +224,30 @@ https://github.com/NewTurn2017/cmux-remote
 
 ---
 
-## Version 1.0.3 Release Notes
+## Version 1.0.5 Release Notes
 
 ### What’s New — en-US
 
 ```
-Cmux Remote 1.0.3 is an urgent reliability fix for real-device Mac connection setup.
+Cmux Remote 1.0.5 focuses on mobile terminal input polish and keyboard-safe viewing.
 
-- Fixes Mac relay reconnection when cmux rotates its local Unix socket, preventing stale socket paths from leaving the iPhone stuck on “Connection refused”.
-- Reinstalls now leave the relay on dynamic socket discovery by default, so future cmux restarts are picked up automatically.
-- Adds regression coverage for socket-path fallback, stale marker recovery, and relay connection refresh behavior.
+- Adds LIVE input mode for immediate per-character terminal input, so English typing and quick key edits can be sent without pressing Enter or Submit.
+- Protects Korean/Hangul IME input by keeping composed Korean text out of LIVE immediate-send mode, preventing jamo from being split while typing.
+- Removes the bottom gap under the terminal input panel so the composer sits flush with the bottom edge when the software keyboard is hidden.
+- Adds five terminal rows of extra bottom scroll room, making it possible to pull terminal content above the input panel when the bottom rows would otherwise be covered.
+- Improves Claude/Codex-style “needs input” Inbox coverage and regression tests for notification visibility.
 ```
 
 ### 새로운 기능 — ko
 
 ```
-cmux Remote 1.0.3은 실기기 Mac 연결 안정성을 바로잡는 긴급 수정 업데이트입니다.
+cmux Remote 1.0.5는 모바일 터미널 입력과 키보드 표시 중 화면 가시성을 다듬은 업데이트입니다.
 
-- cmux가 로컬 Unix socket을 새로 만들 때 relay가 오래된 socket을 붙잡아 iPhone에서 “Connection refused”가 반복되던 문제를 수정했습니다.
-- 재설치 후 relay가 기본적으로 동적 socket 탐색을 사용하므로, 이후 cmux 재시작/교체도 자동으로 따라갑니다.
-- socket 경로 fallback, 오래된 marker 복구, relay 재연결 동작에 대한 회귀 테스트를 추가했습니다.
+- 제출 버튼 없이 글자 단위로 바로 전송하는 LIVE 입력 모드를 추가했습니다.
+- 한글/Hangul IME 입력은 LIVE 즉시 전송에서 제외해 입력 중 자모가 분리되지 않도록 했습니다.
+- 키보드가 숨겨진 상태에서 터미널 입력 패널 아래에 생기던 하단 공백을 제거했습니다.
+- 입력 패널에 가려질 수 있는 하단 터미널 내용을 위로 끌어올려 볼 수 있도록 터미널 하단에 5행 스크롤 여유를 추가했습니다.
+- Claude/Codex 계열 “needs input” Inbox 표시 회귀 테스트를 보강했습니다.
 ```
 
 ## App Privacy ("Data Used to Track You" / "Data Collected")
@@ -335,14 +339,15 @@ App previews (video): not required for v1.0.
 
 - [ ] Apple Developer Program active ($99/yr)
 - [ ] App registered in App Store Connect with bundle id `com.genie.CmuxRemote`
-- [ ] Demo Mode verified to work in Release build for v1.0.3 build 4
+- [ ] Demo Mode verified to work in Release build for v1.0.5 build 6
 - [ ] `ITSAppUsesNonExemptEncryption=false` in Info.plist (✅ done)
 - [ ] PRIVACY.md committed and accessible at the URL above (✅ done)
 - [ ] App Review Notes pasted from this document
 - [ ] Both en-US and ko metadata filled in
 - [ ] Screenshots uploaded for at least 6.9"
 - [ ] In-App Purchases: none (v1.0)
-- [x] Build archived with Release config + Distribution provisioning profile for v1.0.3 build 4
-- [x] Build uploaded via altool → App Store Connect
+- [x] Build archived with Release config + Distribution provisioning profile for v1.0.5 build 6
+- [x] Build exported and validated for App Store Connect upload
+- [x] Build uploaded to App Store Connect. Delivery UUID: `8e42ff35-6b51-4803-9f9c-bea2dde9063b`
 - [ ] TestFlight internal test passes (recommended before public submit)
 - [ ] Submit for Review

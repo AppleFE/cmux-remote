@@ -64,4 +64,27 @@ final class CommandComposerTests: XCTestCase {
         XCTAssertNotNil(composer.errorMessage)
         XCTAssertEqual(composer.history, [])
     }
+    func testLiveInputTranslatorMapsTextNewlineAndDelete() {
+        let text = LiveTerminalInputTranslator.interpret(replacementText: "hello")
+        XCTAssertEqual(text, [.text("hello")])
+
+        let newline = LiveTerminalInputTranslator.interpret(replacementText: "\n")
+        XCTAssertEqual(newline, [.key(.enter)])
+
+        let delete = LiveTerminalInputTranslator.interpretDeletion(count: 2)
+        XCTAssertEqual(delete, [.key(.backspace), .key(.backspace)])
+    }
+
+    func testLiveInputTranslatorSuppressesHangulImmediateSend() {
+        XCTAssertEqual(LiveTerminalInputTranslator.interpret(replacementText: "ㅎ"), [])
+        XCTAssertEqual(LiveTerminalInputTranslator.interpret(replacementText: "한"), [])
+        XCTAssertEqual(LiveTerminalInputTranslator.interpret(replacementText: "hello한"), [])
+        XCTAssertTrue(LiveTerminalInputTranslator.containsHangul("한글"))
+        XCTAssertTrue(LiveTerminalInputTranslator.containsHangul("ㅎㅏㄴ"))
+        XCTAssertFalse(LiveTerminalInputTranslator.containsHangul("hello"))
+        XCTAssertFalse(LiveTerminalInputTranslator.shouldUseLocalEditing(currentText: "$ ", replacementText: "a"))
+        XCTAssertTrue(LiveTerminalInputTranslator.shouldUseLocalEditing(currentText: "$ ", replacementText: "한"))
+        XCTAssertTrue(LiveTerminalInputTranslator.shouldUseLocalEditing(currentText: "$ 한", replacementText: ""))
+    }
+
 }

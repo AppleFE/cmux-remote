@@ -52,10 +52,10 @@ public struct BootInfo: Codable, Sendable, Equatable {
 }
 
 public enum EventCategory: String, Codable, Sendable, CaseIterable {
-    case workspace, surface, notification, system, unknown
+    case workspace, surface, notification, system, agent, hook, unknown
 
     public static var allCases: [EventCategory] {
-        [.workspace, .surface, .notification, .system]
+        [.workspace, .surface, .notification, .system, .agent, .hook]
     }
 
     public init(from decoder: Decoder) throws {

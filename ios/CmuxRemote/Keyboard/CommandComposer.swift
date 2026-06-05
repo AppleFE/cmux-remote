@@ -111,3 +111,58 @@ public struct CommandComposer: Equatable {
         }
     }
 }
+
+
+public enum LiveTerminalInputAction: Equatable {
+    case text(String)
+    case key(Key)
+}
+
+public enum LiveTerminalInputTranslator {
+    public static func interpret(replacementText text: String) -> [LiveTerminalInputAction] {
+        guard !text.isEmpty else { return [] }
+        guard !containsHangul(text) else { return [] }
+        var actions: [LiveTerminalInputAction] = []
+        var buffer = ""
+        func flushBuffer() {
+            guard !buffer.isEmpty else { return }
+            actions.append(.text(buffer))
+            buffer = ""
+        }
+        for character in text {
+            switch character {
+            case Character("\n"), Character("\r"):
+                flushBuffer()
+                actions.append(.key(.enter))
+            default:
+                buffer.append(character)
+            }
+        }
+        flushBuffer()
+        return actions
+    }
+
+    public static func interpretDeletion(count: Int = 1) -> [LiveTerminalInputAction] {
+        guard count > 0 else { return [] }
+        return Array(repeating: .key(.backspace), count: count)
+    }
+
+    public static func shouldUseLocalEditing(currentText: String, replacementText text: String) -> Bool {
+        containsHangul(currentText) || containsHangul(text)
+    }
+
+    public static func containsHangul(_ text: String) -> Bool {
+        text.unicodeScalars.contains { scalar in
+            switch scalar.value {
+            case 0x1100...0x11FF,
+                 0x3130...0x318F,
+                 0xA960...0xA97F,
+                 0xAC00...0xD7A3,
+                 0xD7B0...0xD7FF:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+}

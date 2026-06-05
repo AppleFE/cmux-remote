@@ -60,12 +60,28 @@ private extension EventFrame {
     var isNeedsInputEvent: Bool {
         let text = inboxSearchText
         let needsHuman = text.contains("needs input")
+            || text.contains("waiting for your input")
             || text.contains("needs your attention")
             || text.contains("needs your approval")
             || text.contains("approval required")
             || text.contains("permission prompt")
-        let isClaudeCode = text.contains("claude")
-        return needsHuman && (isClaudeCode || text.contains("needs input"))
+        return needsHuman && (hasKnownAgentSource || isDirectNeedsInputEvent)
+    }
+
+    var hasKnownAgentSource: Bool {
+        let text = inboxSearchText
+        return text.contains("claude")
+            || text.contains("codex")
+            || text.contains("openai")
+    }
+
+    var isDirectNeedsInputEvent: Bool {
+        let normalizedName = name
+            .lowercased()
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+        return inboxSearchText.contains("needs input")
+            || normalizedName.contains("needs input")
     }
 
     var inboxSearchText: String {
@@ -159,11 +175,21 @@ private extension NotificationRecord {
 
 private extension EventFrame {
     var titleFallback: String {
-        if isNeedsInputEvent { return "Claude Code needs input" }
+        if isNeedsInputEvent { return "\(needsInputSourceName) needs input" }
         switch name {
         case "notification.created": return "cmux 알림"
         default: return name
         }
+    }
+
+    var needsInputSourceName: String {
+        let text = inboxSearchText
+        if text.contains("codex") { return "Codex" }
+        if text.contains("openai") { return "OpenAI" }
+        if text.contains("claude") { return "Claude Code" }
+        if category == .hook { return "cmux hook" }
+        if category == .agent { return "Agent" }
+        return "cmux"
     }
 
     func syntheticNeedsInputNotificationId(
