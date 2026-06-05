@@ -18,11 +18,11 @@ cmux exclusively over a documented JSON-RPC protocol.
 
 ## Status
 
-**Early preview (v1.0.2).** It can:
+**Early preview (v1.0.5).** It can:
 
 - list, open, create, rename, and close cmux workspaces and surfaces
-- mirror any terminal surface in near real-time (15 Hz diff polling)
-- send keystrokes, key combinations, raw text, and command lines
+- mirror any terminal surface in near real-time (15 Hz diff polling, 120-line bounded history)
+- send keystrokes, key combinations, raw text, command lines, and live per-character input
 - surface cmux notifications as iOS local notifications (while the app
   is alive)
 - paste iPhone clipboard text into the command composer
@@ -30,6 +30,7 @@ cmux exclusively over a documented JSON-RPC protocol.
   `~/Downloads/cmux-remote/` and inserting the saved path
 - show the connected MacBook battery state in the workspace header
 - surface Claude/Codex-style `needs input` events in the Inbox
+- keep the terminal input panel flush with the bottom edge and add extra scroll room so hidden terminal rows can be revealed
 - pin cmux pane focus on every send
 
 Smoke-tested against macOS 14 + iOS 17 on both LAN and across a Tailnet
@@ -121,8 +122,10 @@ client that talks to cmux over a documented JSON-RPC schema.
 ### Terminal mirror
 
 - 15 Hz diff polling, full-text fallback, checksum-based reconcile
-- Pinch-to-zoom (8–32 pt) with a smooth anchor-preserving response
-- Tokyo Night Storm ANSI palette plus a CRT scanline shader
+- 120-line bounded history to avoid abrupt 24-line refreshes on surface switch / reload
+- Extra five-row bottom scroll padding so rows behind the input accessory can be pulled fully into view
+- Cached render rows and style runs, drawn through Canvas in run-sized batches for faster scroll and zoom
+- Tokyo Night Storm palette, ANSI 256-color / true-color rendering groundwork, plus a CRT scanline shader
 - Correct East-Asian wide-glyph cell width
 - Suppresses iOS auto-promotion of glyphs like ● ⏺ ✔ ▶ to color emoji
   (Variation Selector-15 plus a small substitution table)
@@ -130,10 +133,12 @@ client that talks to cmux over a documented JSON-RPC schema.
 ### Input
 
 - Accessory bar: `esc` `OK` `/` `$` `tab` `← ↑ ↓ →` `/new` `space`
+- **LIVE input mode** for immediate per-character terminal input without pressing submit
 - Dedicated keyboard-dismiss, backspace, iPhone clipboard paste, and
   photo attach buttons
 - Command composer with text + enter as one shot; the software keyboard
   closes automatically after submit
+- Korean/Hangul IME text stays out of LIVE immediate-send mode so composed syllables do not split into jamo
 - Photo attachments are saved by the Mac relay under
   `~/Downloads/cmux-remote/`, then the saved path is inserted into the
   command field
@@ -218,47 +223,83 @@ client that talks to cmux over a documented JSON-RPC schema.
 
 ## Quickstart
 
+> **Can't connect?** If this is a first install, or the app says it
+> can't reach your Mac, follow the step-by-step setup + troubleshooting
+> guide anyone can apply →
+> **[Connection guide (docs/connection-guide.en.md)](docs/connection-guide.en.md)**
+
+### 0. Before you start (on the Mac)
+
+The relay runs on the same Mac as cmux. Check these three things first:
+
+```bash
+cmux --version                 # cmux must be installed and running
+tailscale status               # Tailscale must be signed in and online
+swift --version                # Swift 5.10+ (Xcode 15.3+) to build
+```
+
+- **cmux must be running** for the relay to attach to its socket
+  (otherwise you get `socketMissing`).
+- Your iPhone and Mac must be signed in to the **same Tailnet**.
+
 ### 1. Build and install the relay on your Mac
 
 ```bash
 git clone https://github.com/NewTurn2017/cmux-remote.git
 cd cmux-remote
-swift build -c release --product cmux-relay
 
-# Install as a launchd user agent (auto-starts on login)
+# Build + install as a launchd user agent (auto-starts on login).
+# The script runs `swift build -c release` for you.
 ./scripts/install-launchd.sh
 ```
 
-The installer copies the binary into `~/.cmuxremote/bin/`, renders
+The installer builds the release binary and copies it into
+`~/.cmuxremote/bin/`, writes a default `~/.cmuxremote/relay.json` if one
+doesn't exist yet, renders
 `~/Library/LaunchAgents/com.genie.cmuxremote.plist`, and bootstraps the
 service. Logs land in `~/.cmuxremote/log/`.
 
-Health check:
+### 2. Confirm the relay is up
 
 ```bash
+# Health check — hit your own Tailscale IP from the Mac
 curl -s http://$(tailscale ip -4):4399/v1/health
-# {"ok":true,"version":"0.1.0"}
-```
+# {"ok":true,"version":"0.1.0"}   ← this means the relay is healthy
 
-Socket probe:
-
-```bash
+# Confirm it also attached to the cmux socket
 ./scripts/cmux-probe.sh
 # {"id":"probe-1","result":{...}}
 ```
 
-### 2. Pair your iPhone
+No response or something off? Check the log first:
+
+```bash
+tail -n 40 ~/.cmuxremote/log/stderr.log
+```
+
+Seeing `starting cmux-relay on 0.0.0.0:4399` → `listening …` →
+`cmux event stream attached` means it's healthy. If not, jump to
+**Troubleshooting connection** below.
+
+### 3. Pair your iPhone
+
+First find your Mac's address:
+
+```bash
+tailscale ip -4          # e.g. 100.x.y.z  ← enter this in the app
+tailscale status         # if you'd rather use the MagicDNS name (e.g. my-mac)
+```
 
 Open cmux Remote on the iPhone:
 
 1. Tap **Add Mac**
-2. Enter the Tailscale IP or MagicDNS name plus port `4399`
+2. Enter the Tailscale IP or MagicDNS name from above, port `4399`
 3. Approve the pairing request from the Mac's menu bar
 
 Pairing exchanges a per-device token. Revoke any device anytime from
 the menu bar.
 
-### 3. Use it
+### 4. Use it
 
 - **Workspaces** — the workspace list. Tap one to expand its surface
   chip bar, or create, rename, and close workspaces in place.
@@ -273,8 +314,9 @@ the menu bar.
 
 ## Configuration
 
-The relay reads `~/.cmuxremote/relay.json` (created by
-`install-launchd.sh` if missing):
+The relay reads `~/.cmuxremote/relay.json`. If the file is missing,
+`install-launchd.sh` writes the default below (an existing file is
+never overwritten):
 
 ```json
 {
@@ -300,6 +342,75 @@ cmux restarts with a socket name such as `cmux-501.sock`. Only set
 
 ---
 
+## Operating the relay
+
+The relay runs as a launchd user agent (`com.genie.cmuxremote`). With
+`RunAtLoad` + `KeepAlive` it auto-starts on login and respawns if it dies.
+
+```bash
+SERVICE="gui/$(id -u)/com.genie.cmuxremote"
+
+# Restart (no rebuild — the most common action)
+launchctl kickstart -k "$SERVICE"
+
+# Status (state / pid / last exit code)
+launchctl print "$SERVICE" | grep -E "state|pid|last exit"
+
+# Live logs
+tail -f ~/.cmuxremote/log/stderr.log
+
+# Pause (use bootout because KeepAlive would respawn it)
+launchctl bootout "$SERVICE"
+```
+
+To pick up source changes, re-run the installer — it builds, copies,
+re-renders the plist, and bootstraps + kickstarts in one shot:
+
+```bash
+./scripts/install-launchd.sh            # includes swift build -c release
+./scripts/uninstall-launchd.sh          # bootout + remove plist
+```
+
+---
+
+## Troubleshooting connection
+
+If the iPhone app can't connect, run these checks **on the Mac**, in
+order — one line at a time. Most issues are resolved by step ① or ②. For
+a full step-by-step walkthrough and a notice you can hand to users, see
+the **[connection guide](docs/connection-guide.en.md)**.
+
+```bash
+SERVICE="gui/$(id -u)/com.genie.cmuxremote"
+```
+
+| Check | Command | If it fails |
+|---|---|---|
+| ① Is cmux running? | `cmux --version` | Launch the cmux app, then `launchctl kickstart -k "$SERVICE"` |
+| ② Is the relay up? | `curl -s http://$(tailscale ip -4):4399/v1/health` | `launchctl kickstart -k "$SERVICE"`; if still down, re-run `./scripts/install-launchd.sh` |
+| ③ Logs healthy? | `tail -n 40 ~/.cmuxremote/log/stderr.log` | See the per-log fixes below |
+| ④ Tailscale online both ends? | `tailscale status` | Make sure Mac and iPhone are on the same Tailnet |
+| ⑤ Right address in the app? | `tailscale ip -4` | Confirm the app uses this IP + port `4399` |
+
+Per-log fixes:
+
+- `cmux event stream unavailable: socketMissing` — **cmux is not
+  running.** Launch the cmux app, then `launchctl kickstart -k "$SERVICE"`.
+- Repeated `Connection refused` — cmux restarted and **the socket name
+  rotated.** Check that `~/Library/Application Support/cmux/last-socket-path`
+  points at the current socket, then re-run `./scripts/install-launchd.sh`.
+- Health check OK but only the app can't attach — **network/address
+  issue.** Confirm the iPhone and Mac share a Tailnet, the app's
+  address/port (`4399`) is correct, and the device token wasn't revoked
+  (`.build/release/cmux-relay devices list`).
+
+The startup log should print `starting cmux-relay on 0.0.0.0:4399` →
+`listening …` → `cmux event stream attached`. If you restart cmux often,
+the fastest way to re-attach after a socket rotation is
+`launchctl kickstart -k "$SERVICE"`.
+
+---
+
 ## Roadmap
 
 - [x] v1.0 — workspace listing, surface create/close, terminal mirror,
@@ -307,6 +418,9 @@ cmux restarts with a socket name such as `cmux-501.sock`. Only set
       Tokyo Night Storm UI
 - [x] v1.0.2 — keyboard layout fixes, photo attach, MacBook battery badge,
       `needs input` Inbox handling, workspace create/rename/close
+- [x] v1.0.3 — real-device relay socket rotation / reconnection reliability
+- [x] v1.0.4 — terminal rendering performance, 120-line history, ANSI 256-color / true-color groundwork, physical iPhone live-relay smoke validation
+- [x] v1.0.5 — LIVE input mode, Hangul IME guard, bottom-flush input panel, five-row terminal scroll padding, Claude/Codex Inbox regression coverage
 - [ ] **v1.1 — APNs push** (alerts that arrive while the app is killed
       or long-backgrounded), payload-driven deep-link to surface
 - [ ] v1.2 — iPad layout, external keyboard polish

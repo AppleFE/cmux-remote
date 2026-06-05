@@ -102,7 +102,11 @@ if [ "$DRY_RUN" -eq 1 ]; then
   note "dry-run; no build, copy, writes, or launchctl calls"
   note "label: $LABEL"
   note "binary: $BIN_DEST"
-  note "config: $CONFIG"
+  if [ -f "$CONFIG" ]; then
+    note "config: $CONFIG (exists)"
+  else
+    note "config: $CONFIG (would write default relay.json)"
+  fi
   if [ -n "$SOCKET" ]; then
     note "socket override: $SOCKET"
   else
@@ -122,7 +126,21 @@ fi
 
 command -v swift >/dev/null 2>&1 || fail "missing required tool: swift"
 command -v launchctl >/dev/null 2>&1 || fail "missing required tool: launchctl"
-[ -f "$CONFIG" ] || fail "missing config: $CONFIG (create ~/.cmuxremote/relay.json first)"
+
+# First-run convenience: if there is no config yet, write a sane default so a
+# brand-new user does not have to hand-author relay.json before the first
+# install. Existing configs are never touched.
+if [ ! -f "$CONFIG" ]; then
+  note "no config at $CONFIG; writing default relay.json"
+  mkdir -p "$(dirname "$CONFIG")"
+  cat > "$CONFIG" <<'JSON'
+{
+  "listen":      "0.0.0.0:4399",
+  "default_fps": 15,
+  "idle_fps":    5
+}
+JSON
+fi
 
 note "building release binary"
 (cd "$ROOT" && swift build -c release)
