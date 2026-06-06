@@ -36,6 +36,24 @@ macOS 14 + iOS 17 실기기 + 시뮬레이터에서 같은 Wi-Fi와 Tailnet
 > 백그라운드에서 WebSocket이 살아있는 동안만 iOS 배너가 뜹니다. 진짜
 > APNs 푸시(앱이 종료/장시간 백그라운드일 때도 도달)는 v1.1 로드맵.
 
+---
+
+## 변경 이력
+
+> 최근 변경을 최신순으로 요약합니다. 형식: `날짜 · 버전/범위 · 요약`.
+> 범위 — `app`(iOS 앱) · `relay`(Mac 데몬) · `setup`(설치/문서).
+> 버전별 App Store 상세 노트는
+> [`docs/launch-assets/release-notes/`](docs/launch-assets/release-notes/)에 있습니다.
+
+- **2026-06-06 · relay** — cmux 1.0.5가 Unix 소켓을 `~/Library/Application Support/cmux`에서 `~/.local/state/cmux`로 이전한 것에 대응. `cmuxSocketPath()`가 마커를 최신순(`/tmp/cmux-last-socket-path` → `~/.local/state/cmux/last-socket-path` → 레거시 Application Support)으로 추적하고, 없으면 `~/.local/state/cmux/cmux.sock`로 폴백. **iOS 앱 무변경 → App Store 재제출 불필요.**
+- **2026-06-05 · v1.0.5 (app)** — LIVE 즉시 입력 모드(문자 단위 즉시 전송), 한글 IME 보호(조합 중 자모 분리 방지), 입력 패널 하단 flush, 터미널 하단 스크롤 여유 5줄, `needs input` Inbox 커버리지 개선.
+- **2026-06-05 · setup** — relay 설치 스크립트 foolproof화 + 연결 가이드(`docs/connection-guide.md`) 추가.
+- **2026-05-29 · v1.0.4 (app)** — 파싱 row/style run 캐싱으로 터미널 렌더링 가속, 120줄 bounded history, 256색/트루컬러 ANSI, checksum 정합 개선.
+- **2026-05-28 · v1.0.3 (relay)** — cmux가 소켓을 rotation할 때 stale 소켓을 붙잡아 "Connection refused"가 반복되던 문제 수정, 재설치 시 기본 동적 소켓 탐색, 소켓 경로 회귀 테스트 추가.
+- **2026-05-24 · v1.0.2 (app)** — 모바일 키보드 동작 개선, 작업공간 생성/이름변경/닫기, 이미지 첨부, 연결 컴퓨터 배터리 상태, Inbox 개선.
+
+---
+
 ## 스크린샷
 
 <p align="center">

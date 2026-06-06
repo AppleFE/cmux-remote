@@ -42,6 +42,24 @@ Smoke-tested against macOS 14 + iOS 17 on both LAN and across a Tailnet
 > banners arrive when the app is killed or has been backgrounded for a
 > long time) is on the v1.1 roadmap.
 
+---
+
+## Changelog
+
+> Recent changes, newest first. Format: `date · version/scope · summary`.
+> Scopes — `app` (iOS app) · `relay` (Mac daemon) · `setup` (install/docs).
+> Per-version App Store notes live in
+> [`docs/launch-assets/release-notes/`](docs/launch-assets/release-notes/).
+
+- **2026-06-06 · relay** — Track cmux's relocated socket after cmux 1.0.5 moved its Unix socket from `~/Library/Application Support/cmux` to `~/.local/state/cmux`. `cmuxSocketPath()` now follows the markers newest-convention-first (`/tmp/cmux-last-socket-path` → `~/.local/state/cmux/last-socket-path` → legacy Application Support), falling back to `~/.local/state/cmux/cmux.sock`. **No iOS app change → no App Store resubmission.**
+- **2026-06-05 · v1.0.5 (app)** — LIVE per-character input mode, Korean/Hangul IME protection (no jamo splitting), bottom-flush input panel, five extra terminal scroll rows, improved `needs input` Inbox coverage.
+- **2026-06-05 · setup** — Foolproof relay install script + connection guide (`docs/connection-guide.md`).
+- **2026-05-29 · v1.0.4 (app)** — Cached parsed rows/style runs for faster terminal rendering, 120-line bounded history, 256-color/true-color ANSI, better checksum reconciliation.
+- **2026-05-28 · v1.0.3 (relay)** — Fix repeated "Connection refused" when cmux rotates its socket, default dynamic socket discovery on reinstall, socket-path regression tests.
+- **2026-05-24 · v1.0.2 (app)** — Mobile keyboard behavior, workspace create/rename/close, image attachments, connected-computer battery status, Inbox improvements.
+
+---
+
 ## Screenshots
 
 <p align="center">
