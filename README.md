@@ -283,9 +283,13 @@ iPhone에서 cmux Remote 열기:
 
 1. **Add Mac** 탭
 2. 위에서 확인한 Tailscale IP 또는 MagicDNS 이름 입력, 포트는 `4399`
-3. Mac 메뉴바에서 페어링 승인
+3. **Add** — relay가 Tailscale 신원을 확인하고 페어링합니다
 
-페어링 시 디바이스별 토큰이 발급됩니다. 메뉴바에서 언제든 개별 revoke.
+단, relay는 `allow_login`에 등록된 tailnet 로그인의 기기만 허용합니다.
+기본 설정의 `allow_login`은 비어 있어 첫 페어링이 `403 Forbidden`으로
+막히므로, 아래 **설정**의 `allow_login`에 본인 로그인을 먼저 추가하세요.
+페어링 시 디바이스별 토큰이 발급되며
+`~/.cmuxremote/bin/cmux-relay devices revoke <id>`로 언제든 해지할 수 있습니다.
 
 ### 4. 사용
 
@@ -316,6 +320,28 @@ Relay는 `~/.cmuxremote/relay.json`을 읽습니다. 파일이 없으면
 `listen`은 0.0.0.0이지만 비-Tailscale 소스 주소는 애플리케이션
 레이어에서 차단됩니다. 개발 중 localhost를 허용하려면
 `CMUX_DEV_ALLOW_LOCALHOST=1` 환경 변수로 install 스크립트를 돌리세요.
+
+생략한 키는 위 기본값으로 채워지므로 위 3줄짜리 설정만으로도 relay는
+정상 부팅합니다. 단 **페어링하려면 `allow_login`을 한 번 채워야** 합니다 —
+relay는 여기에 나열된 tailnet 로그인의 기기만 허용하고 나머지는
+`403 Forbidden`으로 막습니다. Mac과 iPhone이 같은 Tailscale 계정이면 값은
+동일합니다. 본인 로그인 값은 Tailscale 관리 콘솔, 또는
+`tailscale status --json`의 `Self.UserID`가 가리키는 `User[…].LoginName`
+에서 확인할 수 있습니다 (예: `you@example.com`). 이 값을 넣고 relay를
+재시작하세요:
+
+```json
+{
+  "listen":      "0.0.0.0:4399",
+  "allow_login": ["you@example.com"],
+  "default_fps": 15,
+  "idle_fps":    5
+}
+```
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/com.genie.cmuxremote"
+```
 
 cmux Unix socket은 기본적으로 cmux가 쓰는 last-socket-path 마커를
 최신 규칙부터 따라갑니다: 고정 경로 `/tmp/cmux-last-socket-path` →

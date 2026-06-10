@@ -142,6 +142,9 @@ if [ ! -f "$CONFIG" ]; then
   "idle_fps":    5
 }
 JSON
+  note "the default authorises nobody yet — to pair your phone, add your"
+  note "  tailnet login to \"allow_login\" in $CONFIG, then re-run this script"
+  note "  (or: launchctl kickstart -k $SERVICE)"
 fi
 
 note "building release binary"

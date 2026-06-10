@@ -311,10 +311,13 @@ Open cmux Remote on the iPhone:
 
 1. Tap **Add Mac**
 2. Enter the Tailscale IP or MagicDNS name from above, port `4399`
-3. Approve the pairing request from the Mac's menu bar
+3. **Add** — the relay resolves your Tailscale identity and pairs
 
-Pairing exchanges a per-device token. Revoke any device anytime from
-the menu bar.
+Note: the relay only accepts devices whose tailnet login is listed in
+`allow_login`. The default `allow_login` is empty, so the first pairing
+is rejected with `403 Forbidden` until you add your login under
+**Configuration** below. Pairing exchanges a per-device token; revoke any
+device anytime with `~/.cmuxremote/bin/cmux-relay devices revoke <id>`.
 
 ### 4. Use it
 
@@ -346,6 +349,28 @@ never overwritten):
 `listen` is `0.0.0.0`, but non-Tailscale source addresses are refused
 at the application layer regardless. To allow localhost in dev, run
 the installer with `CMUX_DEV_ALLOW_LOCALHOST=1`.
+
+Omitted keys fall back to the defaults above, so the three-line config
+boots the relay fine — but **pairing requires `allow_login`**. The relay
+only accepts devices whose tailnet login is listed there; everyone else
+gets `403 Forbidden`. Mac and iPhone on the same Tailscale account share
+the same value. Find yours in the Tailscale admin console, or via the
+`User[…].LoginName` that `Self.UserID` points to in
+`tailscale status --json` (e.g. `you@example.com`). Add it and restart
+the relay:
+
+```json
+{
+  "listen":      "0.0.0.0:4399",
+  "allow_login": ["you@example.com"],
+  "default_fps": 15,
+  "idle_fps":    5
+}
+```
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/com.genie.cmuxremote"
+```
 
 By default, the relay follows cmux's `last-socket-path` markers, newest
 convention first: the fixed `/tmp/cmux-last-socket-path`, then
