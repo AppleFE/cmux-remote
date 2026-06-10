@@ -22,8 +22,39 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertEqual(cfg.defaultFps, 15)
     }
 
-    func testRejectsMissingApns() {
-        let json = #"{"listen":"x","allow_login":[],"snippets":[],"default_fps":15,"idle_fps":5}"#
+    /// Regression for #3. The installer (and the documented default) writes a
+    /// minimal relay.json carrying only `listen`/`default_fps`/`idle_fps`. The
+    /// relay must boot from it, filling the omitted optional fields with safe
+    /// defaults, instead of crash-looping with `keyNotFound: allow_login`.
+    func testParsesMinimalInstallerConfig() throws {
+        let json = #"""
+        {
+          "listen":      "0.0.0.0:4399",
+          "default_fps": 15,
+          "idle_fps":    5
+        }
+        """#
+        let cfg = try RelayConfig.decode(jsonString: json)
+        XCTAssertEqual(cfg.listen, "0.0.0.0:4399")
+        XCTAssertEqual(cfg.allowLogin, [])
+        XCTAssertEqual(cfg.snippets, [])
+        XCTAssertEqual(cfg.apns.env, "sandbox")
+        XCTAssertEqual(cfg.apns.keyId, "")
+        XCTAssertEqual(cfg.defaultFps, 15)
+        XCTAssertEqual(cfg.idleFps, 5)
+    }
+
+    /// Any omitted key falls back to the baseline default, so even an empty
+    /// document yields a usable config rather than throwing.
+    func testEmptyObjectUsesDefaults() throws {
+        let cfg = try RelayConfig.decode(jsonString: "{}")
+        XCTAssertEqual(cfg, RelayConfig.defaults)
+    }
+
+    /// A present-but-malformed value (wrong type) still fails loudly — only
+    /// *omitted* keys are defaulted, never bad ones.
+    func testRejectsMalformedValue() {
+        let json = #"{"allow_login": "not-an-array"}"#
         XCTAssertThrowsError(try RelayConfig.decode(jsonString: json))
     }
 

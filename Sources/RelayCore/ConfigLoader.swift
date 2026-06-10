@@ -42,6 +42,36 @@ public struct RelayConfig: Codable, Equatable, Sendable {
         self.snippets = snippets; self.defaultFps = defaultFps; self.idleFps = idleFps
     }
 
+    /// Baseline config used to fill any key omitted from `relay.json`. The
+    /// installer (and the documented happy path) writes only a handful of
+    /// keys, so decoding must tolerate the rest being absent rather than
+    /// throwing `keyNotFound` — which crash-loops the daemon at startup and
+    /// reads to users as "can't connect" (issue #3). Push stays disabled until
+    /// a real `apns` block is supplied; an empty `allow_login` authorises
+    /// nobody until the operator lists their tailnet login.
+    public static let defaults = RelayConfig(
+        listen: "0.0.0.0:4399",
+        allowLogin: [],
+        apns: .init(keyPath: "", keyId: "", teamId: "", topic: "", env: "sandbox"),
+        snippets: [],
+        defaultFps: 15,
+        idleFps: 5
+    )
+
+    /// Tolerant decoder: present keys are decoded normally (a malformed value
+    /// still throws), but any *omitted* key falls back to ``defaults``. This is
+    /// what lets the minimal default `relay.json` boot the relay.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = RelayConfig.defaults
+        self.listen     = try c.decodeIfPresent(String.self,    forKey: .listen)     ?? d.listen
+        self.allowLogin = try c.decodeIfPresent([String].self,  forKey: .allowLogin) ?? d.allowLogin
+        self.apns       = try c.decodeIfPresent(APNs.self,      forKey: .apns)       ?? d.apns
+        self.snippets   = try c.decodeIfPresent([Snippet].self, forKey: .snippets)   ?? d.snippets
+        self.defaultFps = try c.decodeIfPresent(Int.self,       forKey: .defaultFps) ?? d.defaultFps
+        self.idleFps    = try c.decodeIfPresent(Int.self,       forKey: .idleFps)    ?? d.idleFps
+    }
+
     public static func decode(jsonString: String) throws -> RelayConfig {
         try JSONDecoder().decode(RelayConfig.self, from: Data(jsonString.utf8))
     }
@@ -60,14 +90,7 @@ public final class ConfigStore: @unchecked Sendable {
 
     public init(url: URL) {
         self.url = url
-        self.current = RelayConfig(
-            listen: "0.0.0.0:4399",
-            allowLogin: [],
-            apns: .init(keyPath: "", keyId: "", teamId: "", topic: "", env: "sandbox"),
-            snippets: [],
-            defaultFps: 15,
-            idleFps: 5
-        )
+        self.current = .defaults
     }
 
     public func reload() throws {
