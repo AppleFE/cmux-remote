@@ -13,7 +13,6 @@ enum DemoContent {
                 DemoSurface(id: "SF-DEMO-1A", title: "claude-code", screen: claudeCodeAgentLab),
                 DemoSurface(id: "SF-DEMO-1B", title: "codex", screen: codexAgentLab),
                 DemoSurface(id: "SF-DEMO-1C", title: "omx", screen: omxAgentLab),
-                DemoSurface(id: "SF-DEMO-1D", title: "browser", screen: [], kind: .browser, browserFixture: DemoBrowserFixture.fixture()),
             ]
         ),
         DemoWorkspace(
@@ -71,7 +70,6 @@ enum DemoContent {
 
     static func screenFull(for surfaceId: String) -> ScreenFull? {
         guard let surface = surface(for: surfaceId) else { return nil }
-        guard surface.kind == .terminal else { return nil }
         let rows = surface.screen
         let cols = rows.map(\.count).max() ?? 80
         return ScreenFull(
@@ -532,28 +530,4 @@ struct DemoSurface {
     let id: String
     let title: String
     let screen: [String]
-    let kind: SurfaceKind
-    let browserFixture: DemoBrowserFixture?
-
-    init(
-        id: String,
-        title: String,
-        screen: [String],
-        kind: SurfaceKind = .terminal,
-        browserFixture: DemoBrowserFixture? = nil
-    ) {
-        self.id = id
-        self.title = title
-        self.screen = screen
-        self.kind = kind
-        self.browserFixture = browserFixture
-    }
-}
-
-struct DemoBrowserFixture {
-    let url: String
-    let dataBase64: String
-    let width: Int
-    let height: Int
-    let capturedAt: String
 }

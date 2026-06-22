@@ -14,17 +14,6 @@ public struct Workspace: Codable, Sendable, Equatable, Identifiable {
     }
 }
 
-public enum SurfaceKind: String, Codable, Sendable, Equatable, CaseIterable {
-    case terminal
-    case browser
-
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        let rawValue = (try? container.decode(String.self)) ?? Self.terminal.rawValue
-        self = SurfaceKind(rawValue: rawValue) ?? .terminal
-    }
-}
-
 /// Surface as it crosses the relay → iOS boundary.
 ///
 /// Slimmed v2 (2026-05-10): cmux's `surface.list` does not expose terminal grid
@@ -34,19 +23,8 @@ public struct Surface: Codable, Sendable, Equatable, Identifiable {
     public var id: String
     public var title: String
     public var index: Int
-    public var kind: SurfaceKind
     public init(id: String, title: String, index: Int) {
-        self.init(id: id, title: title, index: index, kind: .terminal)
-    }
-    public init(id: String, title: String, index: Int, kind: SurfaceKind) {
-        self.id = id; self.title = title; self.index = index; self.kind = kind
-    }
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = try container.decode(String.self, forKey: .id)
-        self.title = try container.decode(String.self, forKey: .title)
-        self.index = try container.decode(Int.self, forKey: .index)
-        self.kind = try container.decodeIfPresent(SurfaceKind.self, forKey: .kind) ?? .terminal
+        self.id = id; self.title = title; self.index = index
     }
 }
 

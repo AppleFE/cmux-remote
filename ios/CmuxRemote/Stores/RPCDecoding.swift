@@ -173,29 +173,8 @@ struct SurfacePayload: Decodable {
     let id: String
     let title: String
     let index: Int
-    let kind: SurfaceKind
 
-    var model: Surface { Surface(id: id, title: title, index: index, kind: kind) }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(String.self, forKey: .id)
-        title = try container.decode(String.self, forKey: .title)
-        index = try container.decode(Int.self, forKey: .index)
-        kind = try container.decodeIfPresent(SurfaceKind.self, forKey: .type)
-            ?? container.decodeIfPresent(SurfaceKind.self, forKey: .kind)
-            ?? container.decodeIfPresent(SurfaceKind.self, forKey: .surfaceType)
-            ?? .terminal
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case id
-        case title
-        case index
-        case type
-        case kind
-        case surfaceType = "surface_type"
-    }
+    var model: Surface { Surface(id: id, title: title, index: index) }
 }
 
 
