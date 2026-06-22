@@ -104,6 +104,33 @@ public final class WorkspaceStore {
         return Surface(id: payload.surfaceId, title: "terminal", index: surfaces(for: workspaceId).count)
     }
 
+    public func createBrowserSurface(workspaceId: String, initialURL: String? = nil) async throws -> Surface {
+        var params: [String: JSONValue] = [
+            "workspace_id": .string(workspaceId),
+            "focus": .bool(true),
+        ]
+        if let initialURL, !initialURL.isEmpty {
+            params["url"] = .string(initialURL)
+        }
+        let response = try await rpc.call(
+            method: "browser.open_split",
+            params: .object(params)
+        )
+        let payload = try response.unwrapResult().decode(SurfaceMutationPayload.self)
+        await refreshSurfaces(workspaceId: workspaceId)
+        if let surface = surfaces(for: workspaceId).first(where: { $0.id == payload.surfaceId }) {
+            return surface
+        }
+        let fallback = Surface(
+            id: payload.surfaceId,
+            title: "browser",
+            index: surfaces(for: workspaceId).count,
+            kind: .browser
+        )
+        surfacesByWorkspaceId[workspaceId, default: []].append(fallback)
+        return fallback
+    }
+
     public func closeSurface(workspaceId: String, surfaceId: String) async throws {
         _ = try await rpc.call(
             method: "surface.close",

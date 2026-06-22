@@ -170,6 +170,38 @@ Server → Client (push, no `id`):
 
 The set above is the v1.0 surface area. Anything else (browser, vm, …) is intentionally not exposed in v1.
 
+### 6.3.1 Browser MVP addendum (2026-06-21)
+
+The original v1 bridge intentionally left browser surfaces out of scope. The
+browser MVP now adds them as a screenshot-preview remote-control surface, not as
+an embedded local browser or live screencast.
+
+Browser surfaces are preserved from `surface.list` via `Surface.kind == .browser`
+and route to browser-specific UI. Terminal surfaces continue to use
+`surface.subscribe`, `surface.read_text`, `surface.send_text`, and
+`surface.send_key`. Browser surfaces bypass terminal subscription/read_text and
+use browser RPCs instead:
+
+| Client method | Handling |
+|---|---|
+| `browser.open_split` | Forwarded to cmux to create/focus a browser surface |
+| `browser.url.get` | Forwarded to cmux for current URL/title state |
+| `browser.navigate` | Forwarded to cmux with the requested URL |
+| `browser.back` / `browser.forward` / `browser.reload` | Forwarded to cmux navigation controls |
+| `browser.screenshot.read` | Relay-owned wrapper around cmux `browser.screenshot`; returns capped base64 image bytes plus metadata |
+
+`browser.screenshot.read` is the only browser image transport in this milestone.
+It caps decoded image bytes at 6 MiB and returns structured errors for missing
+image data, invalid base64, unsupported upstream result shapes, read failures,
+timeouts, and oversized images. Browser screenshots must not be logged or sent
+as `screen.*` push frames.
+
+This MVP still does not add `WKWebView`, `SFSafariViewController`, SwiftUI
+`WebView`, CDP, raw pointer/keyboard streaming, video/screencast transport, or
+coordinate tap forwarding. A user can open, navigate, go back/forward, reload,
+and manually refresh the remote screenshot preview; the actual page continues to
+run in the Mac-side cmux browser surface.
+
 ### 6.4 DiffEngine
 
 In `RelayCore/DiffEngine.swift`:

@@ -36,9 +36,16 @@ public actor WSProtocolMachine {
     }
 
     private let cmux: CMUXFacade
+    private let screenshotDirectory: URL
     private var helloed = false
 
-    public init(cmux: CMUXFacade) { self.cmux = cmux }
+    public init(
+        cmux: CMUXFacade,
+        screenshotDirectory: URL = BrowserScreenshotReadService.defaultDirectory
+    ) {
+        self.cmux = cmux
+        self.screenshotDirectory = screenshotDirectory
+    }
 
     public var hasHelloed: Bool { helloed }
 
@@ -62,6 +69,27 @@ public actor WSProtocolMachine {
         }
         if let relayAction = Self.relayOwnedAction(for: req) {
             return [relayAction]
+        }
+        if req.method == "browser.screenshot.read" {
+            do {
+                let result = try await BrowserScreenshotReadService.read(
+                    params: req.params,
+                    cmux: cmux,
+                    directory: screenshotDirectory
+                )
+                let resp = RPCResponse(id: req.id, ok: true, result: result.json, error: nil)
+                return [.sendText(Self.encode(resp))]
+            } catch let error as BrowserScreenshotReadError {
+                let resp = Self.errorResponse(id: req.id, code: error.code, message: error.description)
+                return [.sendText(Self.encode(resp))]
+            } catch {
+                let resp = Self.errorResponse(
+                    id: req.id,
+                    code: "upstream_error",
+                    message: String(describing: error)
+                )
+                return [.sendText(Self.encode(resp))]
+            }
         }
 
         do {

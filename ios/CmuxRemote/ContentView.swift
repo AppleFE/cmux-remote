@@ -7,6 +7,7 @@ struct ContentView: View {
 
     let workspaceStore: WorkspaceStore
     let surfaceStore: SurfaceStore
+    let browserStore: BrowserRemoteStore
     let notifStore: NotificationStore
     let hostStatusStore: HostStatusStore
     let onDisconnect: () -> Void
@@ -25,6 +26,7 @@ struct ContentView: View {
                 WorkspaceView(
                     workspaceStore: workspaceStore,
                     surfaceStore: surfaceStore,
+                    browserStore: browserStore,
                     notifStore: notifStore,
                     hostStatusStore: hostStatusStore,
                     preferredSurfaceId: $requestedSurfaceId,

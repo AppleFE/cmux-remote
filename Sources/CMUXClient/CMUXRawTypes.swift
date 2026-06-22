@@ -54,9 +54,32 @@ struct CMUXSurfaceRaw: Decodable {
     let id: String
     let title: String
     let index: Int
+    let kind: SurfaceKind
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.index = try container.decode(Int.self, forKey: .index)
+        self.kind = try container.decodeIfPresent(SurfaceKind.self, forKey: .type)
+            ?? container.decodeIfPresent(SurfaceKind.self, forKey: .kind)
+            ?? container.decodeIfPresent(SurfaceKind.self, forKey: .surfaceType)
+            ?? container.decodeIfPresent(SurfaceKind.self, forKey: .surfaceTypeSnake)
+            ?? .terminal
+    }
 
     func toSurface() -> Surface {
-        Surface(id: id, title: title, index: index)
+        Surface(id: id, title: title, index: index, kind: kind)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case index
+        case type
+        case kind
+        case surfaceType
+        case surfaceTypeSnake = "surface_type"
     }
 }
 

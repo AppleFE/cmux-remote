@@ -14,7 +14,7 @@ public actor DemoRPCDispatch: RPCDispatch {
     public typealias SubscribeHandler = @Sendable (String) async -> Void
 
     private var onSubscribe: SubscribeHandler?
-    private var workspaces: [DemoWorkspace]
+    var workspaces: [DemoWorkspace]
 
     public init() {
         self.workspaces = DemoContent.workspaces
@@ -57,6 +57,9 @@ public actor DemoRPCDispatch: RPCDispatch {
                         "id": .string(surface.id),
                         "title": .string(surface.title),
                         "index": .int(Int64(index)),
+                        "kind": .string(surface.kind.rawValue),
+                        "type": .string(surface.kind.rawValue),
+                        "surface_type": .string(surface.kind.rawValue),
                     ])
                 }),
             ]))
@@ -72,7 +75,8 @@ public actor DemoRPCDispatch: RPCDispatch {
         case "surface.read_text":
             if case .object(let p) = params,
                case .string(let surfaceId)? = p["surface_id"],
-               let surface = surface(for: surfaceId)
+               let surface = surface(for: surfaceId),
+               surface.kind == .terminal
             {
                 return RPCResponse(id: "demo", result: .object([
                     "text": .string(surface.screen.joined(separator: "\n")),
@@ -145,6 +149,49 @@ public actor DemoRPCDispatch: RPCDispatch {
             return RPCResponse(id: "demo", result: .object([
                 "surface_id": .string(surfaceId),
             ]))
+
+        case "browser.open_split":
+            guard case .object(let p) = params,
+                  case .string(let workspaceId)? = p["workspace_id"],
+                  let workspaceIndex = workspaces.firstIndex(where: { $0.id == workspaceId })
+            else {
+                return RPCResponse(id: "demo", result: .object([
+                    "surface_id": .string("SF-DEMO-BROWSER-\(UUID().uuidString.prefix(8))"),
+                ]))
+            }
+            let old = workspaces[workspaceIndex]
+            let surfaceId = "SF-DEMO-BROWSER-\(UUID().uuidString.prefix(8))"
+            let url: String?
+            if case .string(let value)? = p["url"], !value.isEmpty {
+                url = value
+            } else {
+                url = nil
+            }
+            let surface = DemoSurface(
+                id: surfaceId,
+                title: "browser",
+                screen: [],
+                kind: .browser,
+                browserFixture: DemoBrowserFixture.fixture(url: url ?? DemoBrowserFixture.demoURL)
+            )
+            workspaces[workspaceIndex] = DemoWorkspace(id: old.id, title: old.title, surfaces: old.surfaces + [surface])
+            return RPCResponse(id: "demo", result: .object([
+                "surface_id": .string(surfaceId),
+            ]))
+
+        case "browser.url.get":
+            return browserState(params: params)
+
+        case "browser.navigate":
+            return browserNavigate(params: params)
+
+        case "browser.reload",
+             "browser.back",
+             "browser.forward":
+            return RPCResponse(id: "demo", ok: true, result: .object([:]))
+
+        case "browser.screenshot.read":
+            return browserScreenshot(params: params)
 
         case "surface.close":
             if case .object(let p) = params,

@@ -94,6 +94,26 @@ final class CMUXMethodsTests: XCTestCase {
         XCTAssertEqual(surfaces[1].title, "vim main.swift")
     }
 
+    func testSurfaceListRawSchemaDecodesBrowserKindAndDefaultsMissingKindToTerminal() throws {
+        let json = #"""
+        {
+          "workspace_id":"WS-1",
+          "surfaces":[
+            {"id":"SF-BROWSER-TYPE","index":0,"title":"browser type","type":"browser"},
+            {"id":"SF-BROWSER-KIND","index":1,"title":"browser kind","kind":"browser"},
+            {"id":"SF-BROWSER-SURFACE-TYPE","index":2,"title":"browser surface_type","surface_type":"browser"},
+            {"id":"SF-MISSING","index":3,"title":"missing kind"},
+            {"id":"SF-UNKNOWN","index":4,"title":"unknown kind","kind":"preview"}
+          ]
+        }
+        """#
+        let raw = try SharedKitJSON.snakeCaseDecoder.decode(CMUXSurfaceListRaw.self,
+                                                           from: Data(json.utf8))
+        let surfaces = raw.surfaces.map { $0.toSurface() }
+
+        XCTAssertEqual(surfaces.map(\.kind), [.browser, .browser, .browser, .terminal, .terminal])
+    }
+
     /// `surface.read_text` returns flat newline-joined `text` plus a base64
     /// mirror; the translator splits on `\n`, derives `cols` from the longest
     /// line, and stamps a stub cursor at `(0,0)` until cmux exposes cursor

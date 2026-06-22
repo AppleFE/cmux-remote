@@ -99,6 +99,63 @@ final class SmokeUITests: XCTestCase {
         )
     }
 
+    func testBrowserSurfaceRendersRemoteScreenshotAndSkipsTerminalSubscribe() throws {
+        let app = launchFakeRelayApp()
+
+        let workspace = primaryWorkspaceButton(in: app)
+        XCTAssertTrue(workspace.waitForExistence(timeout: 5))
+        workspace.tap()
+
+        let browserChip = app.buttons["browser"]
+        XCTAssertTrue(browserChip.waitForExistence(timeout: 5))
+        browserChip.tap()
+
+        assertBrowserSurfaceVisible(in: app)
+        assertTerminalSurfaceHidden(in: app)
+
+        let addressField = app.textFields["BrowserAddressField"]
+        XCTAssertTrue(addressField.waitForExistence(timeout: 5))
+        let defaultBrowserURL = "https://example.test/cmux-browser"
+        addressField.tap()
+        addressField.typeText("https://example.test/cmux-browser/uitest")
+        let goButton = app.keyboards.buttons["Go"]
+        if goButton.waitForExistence(timeout: 1) {
+            goButton.tap()
+        } else {
+            addressField.typeText("\n")
+        }
+        XCTAssertTrue(addressField.waitForValueContaining("uitest", timeout: 5), addressField.valueDescription)
+        let navigatedURL = addressField.valueDescription
+        XCTAssertNotEqual(navigatedURL, defaultBrowserURL)
+
+        app.buttons["BrowserReloadButton"].tap()
+        XCTAssertTrue(addressField.waitForValue(navigatedURL, timeout: 5), addressField.valueDescription)
+        assertNoBrowserError(in: app)
+        XCTAssertTrue(app.images["BrowserScreenshotImage"].waitForExistence(timeout: 5))
+
+        app.buttons["BrowserRefreshScreenshotButton"].tap()
+        XCTAssertTrue(addressField.waitForValue(navigatedURL, timeout: 5), addressField.valueDescription)
+        assertNoBrowserError(in: app)
+        XCTAssertTrue(app.images["BrowserScreenshotImage"].waitForExistence(timeout: 5))
+
+        app.buttons["NewBrowserSurfaceButton"].tap()
+        XCTAssertTrue(addressField.waitForValue(defaultBrowserURL, timeout: 5), addressField.valueDescription)
+        assertBrowserSurfaceVisible(in: app)
+        assertTerminalSurfaceHidden(in: app)
+
+        app.buttons["WorkspaceBackButton"].tap()
+        let terminalWorkspace = app.buttons["study-bot"]
+        XCTAssertTrue(terminalWorkspace.waitForExistence(timeout: 5))
+        terminalWorkspace.tap()
+
+        let shellChip = app.buttons["shell"]
+        XCTAssertTrue(shellChip.waitForExistence(timeout: 5))
+        shellChip.tap()
+        XCTAssertTrue(app.scrollViews["TerminalViewport"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.otherElements["TerminalAccessoryPanel"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["TerminalScrollToBottomButton"].waitForExistence(timeout: 5))
+    }
+
     func testKeyboardKeepsTerminalAndComposerControlsVisible() throws {
         let app = launchFakeRelayApp()
 

@@ -6,6 +6,7 @@ import os.log
 struct CmuxRemoteApp: App {
     @State private var workspaceStore = WorkspaceStore(rpc: OfflineRPCDispatch())
     @State private var surfaceStore = SurfaceStore(rpc: OfflineRPCDispatch())
+    @State private var browserStore = BrowserRemoteStore(rpc: OfflineRPCDispatch())
     @State private var notifStore = NotificationStore()
     @State private var hostStatusStore = HostStatusStore(rpc: OfflineRPCDispatch())
     @State private var notifPresenter = LocalNotificationPresenter()
@@ -20,6 +21,7 @@ struct CmuxRemoteApp: App {
                 ContentView(
                     workspaceStore: workspaceStore,
                     surfaceStore: surfaceStore,
+                    browserStore: browserStore,
                     notifStore: notifStore,
                     hostStatusStore: hostStatusStore,
                     onDisconnect: disconnect,
@@ -133,11 +135,13 @@ struct CmuxRemoteApp: App {
         let rpc = RPCClient(transport: ws)
         let liveWorkspaceStore = WorkspaceStore(rpc: rpc)
         let liveSurfaceStore = SurfaceStore(rpc: rpc)
+        let liveBrowserStore = BrowserRemoteStore(rpc: rpc)
         let liveHostStatusStore = HostStatusStore(rpc: rpc)
         await MainActor.run {
             liveWorkspaceStore.onWorkspaceAlert = { notifStore.append($0) }
             workspaceStore = liveWorkspaceStore
             surfaceStore = liveSurfaceStore
+            browserStore = liveBrowserStore
             hostStatusStore = liveHostStatusStore
             activeRPC = rpc
         }
@@ -175,6 +179,7 @@ struct CmuxRemoteApp: App {
     private func bootstrap(rpc: any RPCDispatch) async {
         workspaceStore = WorkspaceStore(rpc: rpc)
         surfaceStore = SurfaceStore(rpc: rpc)
+        browserStore = BrowserRemoteStore(rpc: rpc)
         hostStatusStore = HostStatusStore(rpc: rpc)
         await workspaceStore.refresh()
         await hostStatusStore.refreshBattery()
@@ -185,10 +190,12 @@ struct CmuxRemoteApp: App {
         let rpc = DemoRPCDispatch()
         let liveWorkspaceStore = WorkspaceStore(rpc: rpc)
         let liveSurfaceStore = SurfaceStore(rpc: rpc)
+        let liveBrowserStore = BrowserRemoteStore(rpc: rpc)
         let liveHostStatusStore = HostStatusStore(rpc: rpc)
         liveWorkspaceStore.onWorkspaceAlert = { notifStore.append($0) }
         workspaceStore = liveWorkspaceStore
         surfaceStore = liveSurfaceStore
+        browserStore = liveBrowserStore
         hostStatusStore = liveHostStatusStore
 
         // When the user taps a surface chip, push a corresponding screen.full
@@ -221,6 +228,7 @@ struct CmuxRemoteApp: App {
         activeRPC = nil
         workspaceStore.reset()
         surfaceStore.reset()
+        browserStore.reset()
         hostStatusStore.reset()
         bootstrapped = false
         Task { @MainActor in
@@ -237,6 +245,7 @@ struct CmuxRemoteApp: App {
         try? Keychain(service: "com.genie.cmuxremote").wipe()
         workspaceStore.reset()
         surfaceStore.reset()
+        browserStore.reset()
         hostStatusStore.reset()
         bootstrapped = false
     }
