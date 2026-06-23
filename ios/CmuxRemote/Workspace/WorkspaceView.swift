@@ -390,18 +390,26 @@ struct WorkspaceView: View {
                 .accessibilityIdentifier("InputStatusMessage")
             }
 
-            HStack(spacing: 4) {
-                KeyButton(label: "esc") { sendKey(.esc) }
-                KeyButton(label: "OK", accessibilityLabel: "send OK and enter") { sendOK() }
-                KeyButton(label: "/") { sendSymbol("/") }
-                KeyButton(label: "$") { sendSymbol("$") }
-                KeyButton(label: "tab") { sendKey(.tab) }
-                KeyButton(label: "←", accessibilityLabel: "send left arrow") { sendKey(.left) }
-                KeyButton(label: "↑", accessibilityLabel: "send up arrow") { sendKey(.up) }
-                KeyButton(label: "↓", accessibilityLabel: "send down arrow") { sendKey(.down) }
-                KeyButton(label: "→", accessibilityLabel: "send right arrow") { sendKey(.right) }
-                KeyButton(label: "/new", accessibilityLabel: "send slash new shortcut") { sendText("/new") }
-                KeyButton(label: "space", accessibilityLabel: "send space for omx selection") { sendText(" ") }
+            VStack(spacing: 4) {
+                HStack(spacing: 4) {
+                    KeyButton(label: "esc") { sendKey(.esc) }
+                    KeyButton(label: "^C", accessibilityLabel: "send ctrl c") {
+                        sendKey(.named("c", modifiers: [.ctrl]))
+                    }
+                    KeyButton(label: "tab") { sendKey(.tab) }
+                    KeyButton(label: "←", accessibilityLabel: "send left arrow") { sendKey(.left) }
+                    KeyButton(label: "↑", accessibilityLabel: "send up arrow") { sendKey(.up) }
+                    KeyButton(label: "↓", accessibilityLabel: "send down arrow") { sendKey(.down) }
+                    KeyButton(label: "→", accessibilityLabel: "send right arrow") { sendKey(.right) }
+                }
+
+                HStack(spacing: 4) {
+                    KeyButton(label: "OK", accessibilityLabel: "send OK and enter") { sendOK() }
+                    KeyButton(label: "/") { sendSymbol("/") }
+                    KeyButton(label: "$") { sendSymbol("$") }
+                    KeyButton(label: "/new", accessibilityLabel: "send slash new shortcut") { sendText("/new") }
+                    KeyButton(label: "space", accessibilityLabel: "send space for omx selection") { sendText(" ") }
+                }
             }
         }
         .padding(12)

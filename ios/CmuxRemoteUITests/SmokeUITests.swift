@@ -41,6 +41,10 @@ final class SmokeUITests: XCTestCase {
         XCTAssertTrue(inputStatus.waitForExistence(timeout: 5))
         XCTAssertTrue(inputStatus.label.contains("Sent esc"), inputStatus.label)
 
+        app.buttons["send ctrl c"].tap()
+        XCTAssertTrue(inputStatus.waitForExistence(timeout: 5))
+        XCTAssertTrue(inputStatus.label.contains("Sent ctrl+c"), inputStatus.label)
+
         app.buttons["send up arrow"].tap()
         XCTAssertTrue(inputStatus.waitForExistence(timeout: 5))
         XCTAssertTrue(inputStatus.label.contains("Sent up"), inputStatus.label)
@@ -140,6 +144,7 @@ final class SmokeUITests: XCTestCase {
         assertAboveKeyboard(app.buttons["CommandSubmitButton"], keyboardTop: keyboardTop, name: "send")
         let escShortcut = app.buttons["esc"]
         assertVisibleAboveKeyboard(escShortcut, keyboardTop: keyboardTop, name: "esc shortcut")
+        assertVisibleAboveKeyboard(app.buttons["send ctrl c"], keyboardTop: keyboardTop, name: "ctrl+c shortcut")
         assertVisibleAboveKeyboard(app.buttons["send slash new shortcut"], keyboardTop: keyboardTop, name: "/new shortcut")
         assertVisibleAboveKeyboard(app.buttons["send space for omx selection"], keyboardTop: keyboardTop, name: "space shortcut")
         let scrollButton = app.buttons["TerminalScrollToBottomButton"]
