@@ -46,7 +46,7 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if selectedTab != .active {
-                FloatingTabBar(selectedTab: $selectedTab, inboxCount: notifStore.items.count)
+                FloatingTabBar(selectedTab: $selectedTab, inboxCount: notifStore.unreadCount)
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                     .padding(.bottom, 0)
@@ -125,7 +125,8 @@ private struct FloatingTabBar: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 3, style: .continuous))
                                 .padding(.top, 4)
                                 .padding(.trailing, 10)
-                                .accessibilityHidden(true)
+                                .accessibilityIdentifier("InboxUnreadBadge")
+                                .accessibilityLabel("\(inboxCount) unread inbox notifications")
                         }
                     }
                 }

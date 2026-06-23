@@ -537,6 +537,20 @@ final class StoresTests: XCTestCase {
         XCTAssertEqual(store.items.first?.id, "n204")
         XCTAssertEqual(store.items.last?.id, "n5")
     }
+
+    func testNotificationStoreUnreadCountDropsWhenWorkspaceSeen() {
+        let store = NotificationStore()
+        store.append(NotificationRecord(id: "n1", workspaceId: "w1", surfaceId: nil, title: "t1", subtitle: nil, body: "b1", ts: 1, threadId: "th1"))
+        store.append(NotificationRecord(id: "n2", workspaceId: "w2", surfaceId: nil, title: "t2", subtitle: nil, body: "b2", ts: 2, threadId: "th2"))
+
+        XCTAssertEqual(store.unreadCount, 2)
+
+        store.markWorkspaceSeen("w1")
+
+        XCTAssertEqual(store.unreadCount, 1)
+        XCTAssertNil(store.unreadByWorkspace["w1"])
+        XCTAssertEqual(store.unreadByWorkspace["w2"], 1)
+    }
 }
 
 private actor FailingRPCDispatch: RPCDispatch {

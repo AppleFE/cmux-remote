@@ -9,6 +9,7 @@ public final class NotificationStore {
     public var onNew: (@MainActor (NotificationRecord) -> Void)?
 
     public private(set) var unreadByWorkspace: [String: Int] = [:]
+    public private(set) var unreadCount = 0
     private var readIds: Set<String> = []
 
     private var seenIds: Set<String> = []
@@ -39,6 +40,7 @@ public final class NotificationStore {
 
     private func recomputeUnread() {
         unreadByWorkspace = WorkspaceNotificationTally.unreadCounts(records: items, readIds: readIds)
+        unreadCount = unreadByWorkspace.values.reduce(0, +)
     }
 
     public func ingest(_ frame: PushFrame) {

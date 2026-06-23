@@ -165,6 +165,24 @@ final class SmokeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Claude is waiting for your input"].exists)
     }
 
+    func testInboxUnreadBadgeClearsAfterOpeningInboxMessage() throws {
+        let app = launchFakeRelayApp()
+
+        let inboxBadge = app.staticTexts["InboxUnreadBadge"]
+        XCTAssertTrue(inboxBadge.waitForExistence(timeout: 5), app.debugDescription)
+        let initialCount = try unreadBadgeCount(in: app)
+
+        app.buttons["Inbox"].tap()
+        app.staticTexts["Claude Code needs input"].tap()
+
+        let backButton = app.buttons["WorkspaceBackButton"]
+        XCTAssertTrue(backButton.waitForExistence(timeout: 5), app.debugDescription)
+        backButton.tap()
+
+        let finalCount = try unreadBadgeCount(in: app)
+        XCTAssertLessThan(finalCount, initialCount)
+    }
+
     func testLiveInputModeSendsCharactersWithoutSubmit() throws {
         let app = launchFakeRelayApp()
 
@@ -221,6 +239,13 @@ final class SmokeUITests: XCTestCase {
     private func assertVisibleAboveKeyboard(_ element: XCUIElement, keyboardTop: CGFloat, name: String) {
         XCTAssertTrue(element.exists, "\(name) should exist")
         XCTAssertLessThanOrEqual(element.frame.maxY, keyboardTop - 1, "\(name) should not overlap the software keyboard")
+    }
+
+    private func unreadBadgeCount(in app: XCUIApplication) throws -> Int {
+        let badge = app.staticTexts["InboxUnreadBadge"]
+        XCTAssertTrue(badge.waitForExistence(timeout: 5), app.debugDescription)
+        let prefix = badge.label.split(separator: " ").first
+        return try XCTUnwrap(prefix.flatMap { Int(String($0)) })
     }
 }
 

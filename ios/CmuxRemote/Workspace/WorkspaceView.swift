@@ -159,7 +159,7 @@ struct WorkspaceView: View {
     private var terminalHeader: some View {
         VStack(spacing: 10) {
             HStack(spacing: 8) {
-                HeaderSquare(systemName: "chevron.left", action: onBack)
+                HeaderSquare(systemName: "chevron.left", identifier: "WorkspaceBackButton", action: onBack)
 
                 HStack(spacing: 8) {
                     Text("●")
@@ -855,6 +855,7 @@ private struct NewSurfaceChip: View {
 }
 private struct HeaderSquare: View {
     let systemName: String
+    var identifier: String? = nil
     let action: () -> Void
 
     var body: some View {
@@ -871,6 +872,7 @@ private struct HeaderSquare: View {
                 )
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier ?? "")
     }
 }
 
