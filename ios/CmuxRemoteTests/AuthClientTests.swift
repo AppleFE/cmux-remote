@@ -55,6 +55,50 @@ final class AuthClientTests: XCTestCase {
         XCTAssertEqual(try keychain.get("bearer"), "new-token")
         XCTAssertEqual(try keychain.get("relay_host"), "new.ts.net")
     }
+
+    func testRegisterAPNsTokenPostsBearerAndPayload() async throws {
+        let keychain = Keychain(service: "auth.\(UUID().uuidString)")
+        try keychain.set("d1", for: "device_id")
+        try keychain.set("abc", for: "bearer")
+        try keychain.set("mac.tailnet.ts.net", for: "relay_host")
+        let mock = MockHTTPClient { request in
+            XCTAssertEqual(request.url?.absoluteString, "http://mac.tailnet.ts.net:4399/v1/devices/me/apns")
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer abc")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            let body = try! XCTUnwrap(request.httpBody)
+            let object = try! JSONSerialization.jsonObject(with: body) as! [String: String]
+            XCTAssertEqual(object["apns_token"], "00ff10")
+            XCTAssertEqual(object["env"], "sandbox")
+            return (Data(), 204)
+        }
+        let client = AuthClient(host: "mac.tailnet.ts.net", port: 4399, keychain: keychain, http: mock)
+
+        try await client.registerAPNsTokenHex("00ff10", environment: .sandbox)
+    }
+
+    func testRegisterAPNsTokenRequiresBearerBeforeNetwork() async throws {
+        let keychain = Keychain(service: "auth.\(UUID().uuidString)")
+        let mock = MockHTTPClient { _ in XCTFail("network should not be hit"); return (Data(), 500) }
+        let client = AuthClient(host: "mac.tailnet.ts.net", port: 4399, keychain: keychain, http: mock)
+
+        do {
+            try await client.registerAPNsTokenHex("00ff10", environment: .sandbox)
+            XCTFail("expected missingBearer")
+        } catch AuthError.missingBearer {}
+    }
+
+    func testRegisterAPNsTokenRejectsDisallowedHostBeforeNetwork() async throws {
+        let keychain = Keychain(service: "auth.\(UUID().uuidString)")
+        try keychain.set("abc", for: "bearer")
+        let mock = MockHTTPClient { _ in XCTFail("network should not be hit"); return (Data(), 500) }
+        let client = AuthClient(host: "example.com", port: 4399, keychain: keychain, http: mock)
+
+        do {
+            try await client.registerAPNsTokenHex("00ff10", environment: .sandbox)
+            XCTFail("expected disallowedHost")
+        } catch AuthError.disallowedHost {}
+    }
 }
 
 final class MockHTTPClient: HTTPClientFacade, @unchecked Sendable {

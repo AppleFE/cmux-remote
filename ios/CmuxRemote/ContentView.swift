@@ -43,6 +43,9 @@ struct ContentView: View {
                 )
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .cmuxRemoteNotificationResponse)) { notification in
+            openNotificationUserInfo(notification.userInfo)
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if selectedTab != .active {
@@ -66,6 +69,24 @@ struct ContentView: View {
             requestedSurfaceId = nil
         }
         selectedTab = .active
+    }
+
+    private func openNotificationUserInfo(_ userInfo: [AnyHashable: Any]?) {
+        guard let workspaceId = userInfo?["workspace_id"] as? String, !workspaceId.isEmpty else {
+            selectedTab = .inbox
+            return
+        }
+        let rawSurfaceId = userInfo?["surface_id"] as? String
+        let surfaceId = rawSurfaceId?.isEmpty == true ? nil : rawSurfaceId
+        if workspaceStore.workspaces.contains(where: { $0.id == workspaceId }) {
+            workspaceStore.selectedId = workspaceId
+            requestedSurfaceId = surfaceId
+            notifStore.markWorkspaceSeen(workspaceId)
+            selectedTab = .active
+        } else {
+            requestedSurfaceId = nil
+            selectedTab = .inbox
+        }
     }
 }
 

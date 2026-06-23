@@ -4,6 +4,7 @@ import os.log
 
 @main
 struct CmuxRemoteApp: App {
+    @UIApplicationDelegateAdaptor(RemoteNotificationRegistrar.self) private var remoteNotifications
     @State private var workspaceStore = WorkspaceStore(rpc: OfflineRPCDispatch())
     @State private var surfaceStore = SurfaceStore(rpc: OfflineRPCDispatch())
     @State private var notifStore = NotificationStore()
@@ -116,6 +117,11 @@ struct CmuxRemoteApp: App {
         do {
             try await auth.registerIfNeeded()
             os_log("cmux register ok")
+            remoteNotifications.configure(authClient: auth)
+            Task { @MainActor in
+                guard await presenter.requestAuthorizationIfNeeded() else { return }
+                await remoteNotifications.registerForRemoteNotifications()
+            }
         } catch {
             os_log("cmux register FAILED: %{public}@", String(describing: error))
             workspaceStore.connection = .error(String(describing: error))

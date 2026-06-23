@@ -47,6 +47,13 @@ struct Serve: AsyncParsableCommand {
         let manager = SessionManager(reader: reader,
                                      defaultFps: store.current.defaultFps,
                                      idleFps: store.current.idleFps)
+        let deviceStore = try DeviceStore(url: URL(fileURLWithPath: devicesStorePath()))
+        let apnsProvider = APNsProviderClient(config: { store.current.apns })
+        let apnsFanout = InboxPushFanout(
+            deviceStore: deviceStore,
+            sender: apnsProvider,
+            config: { store.current.apns }
+        )
         conn.onReset = {
             Task { await manager.broadcastReset() }
         }
@@ -62,6 +69,7 @@ struct Serve: AsyncParsableCommand {
                             conn.observe(bootInfo: boot)
                         }
                         Task { await manager.broadcastToAll(frame: .event(event)) }
+                        Task { await apnsFanout.deliver(event: event) }
                     }
                     await stream.start(categories: EventCategory.allCases)
                     logger.info("cmux event stream attached")
@@ -82,7 +90,6 @@ struct Serve: AsyncParsableCommand {
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
-        let deviceStore = try DeviceStore(url: URL(fileURLWithPath: devicesStorePath()))
         let auth = TailscaledLocalAuth()
 
         // Foolproof pairing: a fresh relay.json has an empty allow_login, which
