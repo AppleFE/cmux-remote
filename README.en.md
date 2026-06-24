@@ -16,15 +16,41 @@ cmux exclusively over a documented JSON-RPC protocol.
 
 ---
 
+## What's new — v1.0.6
+
+<p align="center">
+  <img src="docs/launch-assets/source/cmux-remote-brandmark-transparent.png" alt="cmux Remote brandmark" width="320">
+</p>
+
+New or changed since v1.0.5:
+
+- 🔔 **Native push notifications (APNs)** — the relay delivers cmux events and Claude/Codex-style `needs input` prompts over APNs. Configure an `apns` block on the relay and banners arrive even when the app is backgrounded or killed; leave it unset and it falls back to the existing local notifications.
+- ⌨️ **Ctrl-C shortcut** — a dedicated Ctrl-C key on the terminal keyboard bar to interrupt a running command.
+- 🖼️ **All five App Store screenshots refreshed** — latest workspace, terminal, keyboard, Inbox, and settings screens.
+
+<table>
+  <tr>
+    <td align="center" width="20%"><img src="docs/launch-assets/screenshots/app-store-6.9/01-workspaces-remote-control.png" alt="Workspace remote control" width="180"><br><sub>Workspace / surface chip bar</sub></td>
+    <td align="center" width="20%"><img src="docs/launch-assets/screenshots/app-store-6.9/02-terminal-live-control.png" alt="Terminal live control" width="180"><br><sub>Live terminal mirror</sub></td>
+    <td align="center" width="20%"><img src="docs/launch-assets/screenshots/app-store-6.9/03-keyboard-shortcuts.png" alt="Key accessory bar" width="180"><br><sub>Key accessory bar · Ctrl-C</sub></td>
+    <td align="center" width="20%"><img src="docs/launch-assets/screenshots/app-store-6.9/04-inbox-notifications.png" alt="Inbox notifications" width="180"><br><sub>Notification Inbox · push</sub></td>
+    <td align="center" width="20%"><img src="docs/launch-assets/screenshots/app-store-6.9/05-settings-connection-guide.png" alt="Settings · pairing" width="180"><br><sub>Settings · pairing guide</sub></td>
+  </tr>
+</table>
+
+> For changes in v1.0.5 and earlier, see the **Changelog** below.
+
+---
+
 ## Status
 
-**Early preview (v1.0.5).** It can:
+**Early preview (v1.0.6).** It can:
 
 - list, open, create, rename, and close cmux workspaces and surfaces
 - mirror any terminal surface in near real-time (15 Hz diff polling, 120-line bounded history)
-- send keystrokes, key combinations, raw text, command lines, and live per-character input
-- surface cmux notifications as iOS local notifications (while the app
-  is alive)
+- send keystrokes, key combinations, raw text, command lines, and live per-character input, with a dedicated Ctrl-C shortcut
+- surface cmux notifications in the Inbox as iOS local notifications, or
+  as APNs push when the relay has an `apns` block configured
 - paste iPhone clipboard text into the command composer
 - attach iPhone photos by saving them to the Mac under
   `~/Downloads/cmux-remote/` and inserting the saved path
@@ -36,11 +62,12 @@ cmux exclusively over a documented JSON-RPC protocol.
 Smoke-tested against macOS 14 + iOS 17 on both LAN and across a Tailnet
 (Tailscale 1.84+), on simulator and a physical iPhone.
 
-> **Notification caveat** — current notifications are *local*: iOS
-> banners only fire while the app is foregrounded, or while it's still
-> alive in the background with an open WebSocket. True APNs push (so
-> banners arrive when the app is killed or has been backgrounded for a
-> long time) is on the v1.1 roadmap.
+> **Notification delivery** — as of 1.0.6, configuring an `apns` block on
+> the relay delivers banners over APNs even when the app is killed or
+> long-backgrounded. Without APNs configured, notifications behave as
+> before: local banners that only fire while the app is foregrounded, or
+> while it's still alive in the background with an open WebSocket. (See the
+> `apns` block under **Configuration**.)
 
 ---
 
@@ -51,30 +78,13 @@ Smoke-tested against macOS 14 + iOS 17 on both LAN and across a Tailnet
 > Per-version App Store notes live in
 > [`docs/launch-assets/release-notes/`](docs/launch-assets/release-notes/).
 
+- **2026-06-23 · v1.0.6 (app + relay)** — Native APNs push notifications (banners reach a killed app when an `apns` block is configured on the relay; local-notification fallback otherwise), a dedicated Ctrl-C shortcut on the terminal keyboard bar, and all five App Store 6.9" screenshots refreshed.
 - **2026-06-06 · relay** — Track cmux's relocated socket after cmux 1.0.5 moved its Unix socket from `~/Library/Application Support/cmux` to `~/.local/state/cmux`. `cmuxSocketPath()` now follows the markers newest-convention-first (`/tmp/cmux-last-socket-path` → `~/.local/state/cmux/last-socket-path` → legacy Application Support), falling back to `~/.local/state/cmux/cmux.sock`. **No iOS app change → no App Store resubmission.**
 - **2026-06-05 · v1.0.5 (app)** — LIVE per-character input mode, Korean/Hangul IME protection (no jamo splitting), bottom-flush input panel, five extra terminal scroll rows, improved `needs input` Inbox coverage.
 - **2026-06-05 · setup** — Foolproof relay install script + connection guide (`docs/connection-guide.md`).
 - **2026-05-29 · v1.0.4 (app)** — Cached parsed rows/style runs for faster terminal rendering, 120-line bounded history, 256-color/true-color ANSI, better checksum reconciliation.
 - **2026-05-28 · v1.0.3 (relay)** — Fix repeated "Connection refused" when cmux rotates its socket, default dynamic socket discovery on reinstall, socket-path regression tests.
 - **2026-05-24 · v1.0.2 (app)** — Mobile keyboard behavior, workspace create/rename/close, image attachments, connected-computer battery status, Inbox improvements.
-
----
-
-## Screenshots
-
-<p align="center">
-  <img src="docs/launch-assets/source/cmux-remote-brandmark-transparent.png" alt="cmux Remote brandmark" width="320">
-</p>
-
-<table>
-  <tr>
-    <td align="center" width="20%"><img src="docs/launch-assets/screenshots/app-store-6.9/01-workspaces-remote-control.png" alt="Workspace remote control" width="180"><br><sub>Workspace / surface chip bar</sub></td>
-    <td align="center" width="20%"><img src="docs/launch-assets/screenshots/app-store-6.9/02-terminal-live-control.png" alt="Terminal live control" width="180"><br><sub>Live terminal mirror</sub></td>
-    <td align="center" width="20%"><img src="docs/launch-assets/screenshots/app-store-6.9/03-keyboard-shortcuts.png" alt="Key accessory bar" width="180"><br><sub>Key accessory bar</sub></td>
-    <td align="center" width="20%"><img src="docs/launch-assets/screenshots/app-store-6.9/04-inbox-notifications.png" alt="Inbox notifications" width="180"><br><sub>Notification Inbox</sub></td>
-    <td align="center" width="20%"><img src="docs/launch-assets/screenshots/app-store-6.9/05-settings-connection-guide.png" alt="Settings · pairing" width="180"><br><sub>Settings · pairing guide</sub></td>
-  </tr>
-</table>
 
 ---
 
@@ -178,8 +188,11 @@ client that talks to cmux over a documented JSON-RPC schema.
   only fires one banner
 - Inbox view holds the most recent 200 entries (newest first)
 - Claude/Codex-style `needs input`, `needs attention`, and approval events are promoted into the same Inbox stream
-- Deep link `cmux://surface/<id>` (will be joined by APNs payload
-  routing in M6)
+- With an `apns` block configured, cmux events / `needs input` are
+  delivered as APNs push (reaching a killed app); without it, the Inbox
+  falls back to local notifications
+- Deep link `cmux://surface/<id>` (payload-driven deep-link auto-open is
+  planned for v1.1)
 - `SEND TEST NOTIFICATION` button in Settings: a local inject for
   immediate Inbox/banner confirmation, plus a separate status line for
   the relay→cmux→events.stream round-trip
@@ -200,6 +213,8 @@ client that talks to cmux over a documented JSON-RPC schema.
 - iPhone photo uploads saved only under `~/Downloads/cmux-remote/` via `file.upload`
 - Dedicated cmux UDS channel for the events stream (the subscribed
   channel becomes push-only and won't accept further RPC responses)
+- APNs push fanout (`APNsProvider`) — per-device-token delivery, disabled
+  when no `apns` block is configured
 
 ### Security
 
@@ -386,9 +401,23 @@ update moves it from `~/Library/Application Support/cmux` to
 `~/.local/state/cmux`. Only set `CMUX_SOCKET_PATH=/path/to/socket` when you
 deliberately need a fixed socket.
 
-> **APNs key fields (`apns_team_id`, `apns_key_id`, `apns_key_path`)
-> are coming in v1.1.** Until then, cmux notifications are presented
-> as iOS local notifications only — they do not reach a killed app.
+> **APNs push (`apns` block).** Add an `apns` block to `relay.json` and
+> cmux notifications are delivered over APNs, reaching the app even when
+> it's killed. Without the block, notifications are local-only.
+>
+> ```json
+> {
+>   "apns": {
+>     "key_path": "~/.cmuxremote/AuthKey_XXXXXXXXXX.p8",
+>     "key_id":   "XXXXXXXXXX",
+>     "team_id":  "XXXXXXXXXX",
+>     "topic":    "com.genie.CmuxRemote",
+>     "env":      "prod"
+>   }
+> }
+> ```
+>
+> Set `env` to `"sandbox"` for dev/sideload builds, `"prod"` for App Store / release builds.
 
 ---
 
@@ -473,8 +502,8 @@ the fastest way to re-attach after a socket rotation is
 - [x] v1.0.3 — real-device relay socket rotation / reconnection reliability
 - [x] v1.0.4 — terminal rendering performance, 120-line history, ANSI 256-color / true-color groundwork, physical iPhone live-relay smoke validation
 - [x] v1.0.5 — LIVE input mode, Hangul IME guard, bottom-flush input panel, five-row terminal scroll padding, Claude/Codex Inbox regression coverage
-- [ ] **v1.1 — APNs push** (alerts that arrive while the app is killed
-      or long-backgrounded), payload-driven deep-link to surface
+- [x] v1.0.6 — native APNs push (reaches a killed app), Ctrl-C shortcut, all five App Store screenshots refreshed
+- [ ] **v1.1 — push follow-ups** — payload-driven deep-link auto-open to the surface, delivery reliability / retries
 - [ ] v1.2 — iPad layout, external keyboard polish
 - [ ] v1.3 — file preview for cmux's "open in pane" intents
 - [ ] v2.0 — byte-stream RPC for high-rate TUIs (vim, htop, k9s)
