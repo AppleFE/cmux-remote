@@ -11,8 +11,14 @@ import SharedKit
 public struct HTTPResponseLite: Sendable {
     public var status: HTTPResponseStatus
     public var body: Data?
-    public init(_ status: HTTPResponseStatus, body: Data? = nil) {
-        self.status = status; self.body = body
+    /// Per-response headers (e.g. `Content-Type` for static assets). The
+    /// HTTP layer always overrides `Content-Length` and `Connection`, so
+    /// setting them here has no effect.
+    public var headers: [String: String]
+    public init(_ status: HTTPResponseStatus,
+                body: Data? = nil,
+                headers: [String: String] = [:]) {
+        self.status = status; self.body = body; self.headers = headers
     }
 }
 
@@ -81,6 +87,10 @@ public actor Routes {
             return .init(.noContent)
 
         default:
+            // Web client (bundled static assets). GET only; everything else 404s.
+            if method == .GET, let resp = serveStatic(path: path) {
+                return resp
+            }
             return .init(.notFound)
         }
     }
@@ -181,6 +191,46 @@ public actor Routes {
         } catch {
             return .init(.internalServerError)
         }
+    }
+
+    // MARK: - Static web client
+
+    /// Serve the bundled web client (index.html / app.js / style.css) from
+    /// the SwiftPM `WebResources` resource bundle. Returns nil for unknown
+    /// paths so the caller can fall through to 404.
+    private func serveStatic(path: String) -> HTTPResponseLite? {
+        let name: String
+        switch path {
+        case "/", "/index.html": name = "index.html"
+        case "/app.js":          name = "app.js"
+        case "/style.css":       name = "style.css"
+        default: return nil
+        }
+        let base = (name as NSString).deletingPathExtension
+        let ext  = (name as NSString).pathExtension
+        guard let url = Bundle.module.url(forResource: base,
+                                          withExtension: ext,
+                                          subdirectory: "WebResources"),
+              let data = try? Data(contentsOf: url) else {
+            return .init(.notFound)
+        }
+        return .init(.ok, body: data,
+                     headers: [
+                       "Content-Type": Self.contentType(for: name),
+                       // Static assets are bundled into the binary, so a stale
+                       // cached copy after a reinstall would run old app.js.
+                       // Force revalidation.
+                       "Cache-Control": "no-cache, no-store, must-revalidate",
+                     ])
+    }
+
+    private static func contentType(for name: String) -> String {
+        if name.hasSuffix(".html") { return "text/html; charset=utf-8" }
+        if name.hasSuffix(".js")   { return "application/javascript; charset=utf-8" }
+        if name.hasSuffix(".css")  { return "text/css; charset=utf-8" }
+        if name.hasSuffix(".png")  { return "image/png" }
+        if name.hasSuffix(".svg")  { return "image/svg+xml" }
+        return "application/octet-stream"
     }
 }
 

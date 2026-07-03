@@ -56,6 +56,9 @@ let package = Package(
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Logging", package: "swift-log"),
+            ],
+            resources: [
+                .copy("WebResources"),
             ]
         ),
         .testTarget(name: "SharedKitTests",  dependencies: ["SharedKit"]),

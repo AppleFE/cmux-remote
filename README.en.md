@@ -237,7 +237,7 @@ client that talks to cmux over a documented JSON-RPC schema.
   `~/.local/state/cmux/cmux.sock`)
 - Swift 5.10 toolchain (Xcode 15.3+) to build from source
 - Tailscale installed and signed in
-- A free TCP port for the relay (default `4399`)
+- A free TCP port for the relay (default `80`)
 
 ### iPhone
 
@@ -280,22 +280,22 @@ swift --version                # Swift 5.10+ (Xcode 15.3+) to build
 git clone https://github.com/NewTurn2017/cmux-remote.git
 cd cmux-remote
 
-# Build + install as a launchd user agent (auto-starts on login).
+# Build + install as a root launchd daemon (binds port 80; needs sudo).
 # The script runs `swift build -c release` for you.
-./scripts/install-launchd.sh
+sudo ./scripts/install-launchd.sh
 ```
 
 The installer builds the release binary and copies it into
-`~/.cmuxremote/bin/`, writes a default `~/.cmuxremote/relay.json` if one
+`/usr/local/lib/cmux-remote/bin/`, writes a default `~/.cmuxremote/relay.json` if one
 doesn't exist yet, renders
-`~/Library/LaunchAgents/com.genie.cmuxremote.plist`, and bootstraps the
-service. Logs land in `~/.cmuxremote/log/`.
+`/Library/LaunchDaemons/com.genie.cmuxremote.plist`, and bootstraps the
+service. The daemon runs as root and binds `0.0.0.0:80`; logs land in `~/.cmuxremote/log/`.
 
 ### 2. Confirm the relay is up
 
 ```bash
 # Health check — hit your own Tailscale IP from the Mac
-curl -s http://$(tailscale ip -4):4399/v1/health
+curl -s http://$(tailscale ip -4):80/v1/health
 # {"ok":true,"version":"0.1.0"}   ← this means the relay is healthy
 
 # Confirm it also attached to the cmux socket
@@ -309,7 +309,7 @@ No response or something off? Check the log first:
 tail -n 40 ~/.cmuxremote/log/stderr.log
 ```
 
-Seeing `starting cmux-relay on 0.0.0.0:4399` → `listening …` →
+Seeing `starting cmux-relay on 0.0.0.0:80` → `listening …` →
 `cmux event stream attached` means it's healthy. If not, jump to
 **Troubleshooting connection** below.
 
@@ -325,7 +325,7 @@ tailscale status         # if you'd rather use the MagicDNS name (e.g. my-mac)
 Open cmux Remote on the iPhone:
 
 1. Tap **Add Mac**
-2. Enter the Tailscale IP or MagicDNS name from above, port `4399`
+2. Enter the Tailscale IP or MagicDNS name from above, port `80`
 3. **Add** — the relay resolves your Tailscale identity and pairs
 
 The relay auto-authorises its own Mac's tailnet login, so an iPhone on the
@@ -333,7 +333,7 @@ same Tailscale account usually pairs with no extra setup. Only for a
 different account, or when the relay runs on a tagged node, add your login
 to `allow_login` under **Configuration** below (any other login gets
 `403 Forbidden`). Pairing exchanges a per-device token; revoke any device
-anytime with `~/.cmuxremote/bin/cmux-relay devices revoke <id>`.
+anytime with `/usr/local/lib/cmux-remote/bin/cmux-relay devices revoke <id>`.
 
 ### 4. Use it
 
@@ -356,7 +356,7 @@ never overwritten):
 
 ```json
 {
-  "listen":      "0.0.0.0:4399",
+  "listen":      "0.0.0.0:80",
   "default_fps": 15,
   "idle_fps":    5
 }
@@ -380,7 +380,7 @@ that `Self.UserID` points to in `tailscale status --json`
 
 ```json
 {
-  "listen":      "0.0.0.0:4399",
+  "listen":      "0.0.0.0:80",
   "allow_login": ["you@example.com"],
   "default_fps": 15,
   "idle_fps":    5
@@ -388,7 +388,7 @@ that `Self.UserID` points to in `tailscale status --json`
 ```
 
 ```bash
-launchctl kickstart -k "gui/$(id -u)/com.genie.cmuxremote"
+sudo launchctl kickstart -k "system/com.genie.cmuxremote"
 ```
 
 By default, the relay follows cmux's `last-socket-path` markers, newest
@@ -427,13 +427,13 @@ The relay runs as a launchd user agent (`com.genie.cmuxremote`). With
 `RunAtLoad` + `KeepAlive` it auto-starts on login and respawns if it dies.
 
 ```bash
-SERVICE="gui/$(id -u)/com.genie.cmuxremote"
+SERVICE="system/com.genie.cmuxremote"
 
 # Restart (no rebuild — the most common action)
-launchctl kickstart -k "$SERVICE"
+sudo launchctl kickstart -k "$SERVICE"
 
 # Status (state / pid / last exit code)
-launchctl print "$SERVICE" | grep -E "state|pid|last exit"
+sudo launchctl print "$SERVICE" | grep -E "state|pid|last exit"
 
 # Live logs
 tail -f ~/.cmuxremote/log/stderr.log
@@ -446,8 +446,8 @@ To pick up source changes, re-run the installer — it builds, copies,
 re-renders the plist, and bootstraps + kickstarts in one shot:
 
 ```bash
-./scripts/install-launchd.sh            # includes swift build -c release
-./scripts/uninstall-launchd.sh          # bootout + remove plist
+sudo ./scripts/install-launchd.sh            # includes swift build -c release
+sudo ./scripts/uninstall-launchd.sh          # bootout + remove plist
 ```
 
 ---
@@ -460,35 +460,35 @@ a full step-by-step walkthrough and a notice you can hand to users, see
 the **[connection guide](docs/connection-guide.en.md)**.
 
 ```bash
-SERVICE="gui/$(id -u)/com.genie.cmuxremote"
+SERVICE="system/com.genie.cmuxremote"
 ```
 
 | Check | Command | If it fails |
 |---|---|---|
-| ① Is cmux running? | `cmux --version` | Launch the cmux app, then `launchctl kickstart -k "$SERVICE"` |
-| ② Is the relay up? | `curl -s http://$(tailscale ip -4):4399/v1/health` | `launchctl kickstart -k "$SERVICE"`; if still down, re-run `./scripts/install-launchd.sh` |
+| ① Is cmux running? | `cmux --version` | Launch the cmux app, then `sudo launchctl kickstart -k "$SERVICE"` |
+| ② Is the relay up? | `curl -s http://$(tailscale ip -4):80/v1/health` | `sudo launchctl kickstart -k "$SERVICE"`; if still down, re-run `sudo ./scripts/install-launchd.sh` |
 | ③ Logs healthy? | `tail -n 40 ~/.cmuxremote/log/stderr.log` | See the per-log fixes below |
 | ④ Tailscale online both ends? | `tailscale status` | Make sure Mac and iPhone are on the same Tailnet |
-| ⑤ Right address in the app? | `tailscale ip -4` | Confirm the app uses this IP + port `4399` |
+| ⑤ Right address in the app? | `tailscale ip -4` | Confirm the app uses this IP + port `80` |
 
 Per-log fixes:
 
 - `cmux event stream unavailable: socketMissing` — **cmux is not
-  running.** Launch the cmux app, then `launchctl kickstart -k "$SERVICE"`.
+  running.** Launch the cmux app, then `sudo launchctl kickstart -k "$SERVICE"`.
 - Repeated `Connection refused` — **the socket path changed** (cmux rotated
   its socket name, or an update moved it to `~/.local/state/cmux`). A current
   relay tracks the markers automatically, so re-running
-  `./scripts/install-launchd.sh` fixes it. In a pinch, pin the path from
+  `sudo ./scripts/install-launchd.sh` fixes it. In a pinch, pin the path from
   `cat /tmp/cmux-last-socket-path` via `CMUX_SOCKET_PATH`.
 - Health check OK but only the app can't attach — **network/address
   issue.** Confirm the iPhone and Mac share a Tailnet, the app's
-  address/port (`4399`) is correct, and the device token wasn't revoked
-  (`.build/release/cmux-relay devices list`).
+  address/port (`80`) is correct, and the device token wasn't revoked
+  (`/usr/local/lib/cmux-remote/bin/cmux-relay devices list`).
 
-The startup log should print `starting cmux-relay on 0.0.0.0:4399` →
+The startup log should print `starting cmux-relay on 0.0.0.0:80` →
 `listening …` → `cmux event stream attached`. If you restart cmux often,
 the fastest way to re-attach after a socket rotation is
-`launchctl kickstart -k "$SERVICE"`.
+`sudo launchctl kickstart -k "$SERVICE"`.
 
 ---
 

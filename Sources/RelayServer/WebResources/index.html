@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>cmux Remote</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand"><span class="brand-cmux">cmux</span>&nbsp;<span class="brand-remote">remote</span></div>
+    <div id="status" class="status disconnected">disconnected</div>
+    <div id="battery" class="battery" title="Mac battery"></div>
+  </header>
+
+  <nav id="tabbar" aria-label="tabs">
+    <button class="tab active" data-tab="workspaces">
+      <span class="tab-glyph">▤</span><span class="tab-label">Workspaces</span>
+    </button>
+    <button class="tab" data-tab="active">
+      <span class="tab-glyph">▶</span><span class="tab-label">Active</span>
+    </button>
+    <button class="tab" data-tab="inbox">
+      <span class="tab-glyph">◔</span><span class="tab-label">Inbox</span>
+      <span id="inbox-badge" class="tab-badge hidden"></span>
+    </button>
+    <button class="tab" data-tab="settings">
+      <span class="tab-glyph">✦</span><span class="tab-label">Settings</span>
+    </button>
+  </nav>
+
+  <!-- ============ WORKSPACES TAB ============ -->
+  <section id="screen-workspaces" class="screen">
+    <div class="scroll-area">
+      <div class="screen-head">
+        <div class="screen-title">
+          <h1><span class="ink">cmux</span> <span class="green">remote</span></h1>
+          <div class="conn-line">
+            <span id="ws-conn-dot" class="dot disconnected"></span>
+            <span id="ws-conn-text" class="mono muted">offline</span>
+          </div>
+        </div>
+        <button id="new-workspace-btn" class="icon-btn" title="New workspace" aria-label="New workspace">+</button>
+      </div>
+
+      <div class="search-bar">
+        <span class="green">/</span>
+        <input id="workspace-search" type="text" placeholder="filter…" autocomplete="off" spellcheck="false">
+      </div>
+
+      <div class="rule"><span class="rule-title">workspaces</span></div>
+
+      <div id="workspace-list" class="stack"></div>
+
+      <div id="workspace-empty" class="empty-state hidden">
+        <div>[ no workspaces ]</div>
+        <small>relay 연결을 확인하거나 새 워크스페이스를 만드세요.</small>
+      </div>
+
+      <div id="workspace-error" class="action-error hidden"><span class="err-mark">!</span><span class="msg"></span></div>
+    </div>
+  </section>
+
+  <!-- ============ ACTIVE TAB (terminal) ============ -->
+  <section id="screen-active" class="screen hidden">
+    <div id="active-header">
+      <div class="active-top-row">
+        <button id="active-back" class="header-sq" title="Back" aria-label="Back">‹</button>
+        <div class="active-title-pill">
+          <span class="green">●</span>
+          <span id="active-workspace-name" class="mono ellipsis">no workspace</span>
+          <span id="active-demo-badge" class="demo-badge hidden">DEMO</span>
+          <button id="active-battery" class="battery-badge" title="Refresh battery"></button>
+          <span class="spacer"></span>
+          <span id="active-close" class="active-x" title="Close">×</span>
+        </div>
+        <button id="active-drawer-btn" class="header-sq" title="Surfaces" aria-label="Surfaces">⊞</button>
+      </div>
+      <div id="surface-bar" class="surface-chips"></div>
+      <div id="surface-action-error" class="action-error hidden"><span class="err-mark">!</span><span class="msg"></span></div>
+    </div>
+
+    <div id="terminal-wrap">
+      <div id="terminal"></div>
+      <button id="scroll-bottom-btn" class="scroll-bottom" title="Scroll to bottom">↓</button>
+    </div>
+
+    <div id="accessory">
+      <div class="composer-row">
+        <button id="input-mode-btn" class="mode-chip" title="Toggle input mode">CMD</button>
+        <span class="green prompt">$</span>
+        <input id="command-input" type="text" placeholder="type a command…" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="composer-actions">
+        <button class="icon-key" id="key-backspace" title="Backspace">⌫</button>
+        <button class="icon-key" id="key-paste" title="Paste">⎘</button>
+        <button class="icon-key" id="key-attach" title="Attach file/image" aria-label="Attach file">⌶</button>
+        <input id="file-input" type="file" class="hidden" accept="image/*,.txt,.log,.json,.md,.csv">
+        <span class="grow"></span>
+        <button id="enter-btn" class="enter-btn">[ ENTER ]</button>
+      </div>
+      <div id="input-feedback" class="input-feedback hidden"></div>
+      <div class="keypad-grid">
+        <button data-key="esc">esc</button>
+        <button data-key="ctrl+c" class="danger">^C</button>
+        <button data-key="tab">tab</button>
+        <button data-key="left">←</button>
+        <button data-key="up">↑</button>
+        <button data-key="down">↓</button>
+        <button data-key="right">→</button>
+        <button data-special="ok">OK</button>
+        <button data-special="slash">/</button>
+        <button data-special="dollar">$</button>
+        <button data-special="slashnew">/new</button>
+        <button data-key="space">space</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ INBOX TAB ============ -->
+  <section id="screen-inbox" class="screen hidden">
+    <div class="scroll-area">
+      <div class="screen-head">
+        <div class="screen-title">
+          <h1><span class="ink">inbox</span> <span id="inbox-count" class="muted">[0]</span></h1>
+        </div>
+      </div>
+      <div class="rule"><span class="rule-title">events</span></div>
+      <div id="inbox-list" class="stack"></div>
+      <div id="inbox-empty" class="empty-state hidden">
+        <div>[ no events ]</div>
+        <small>cmux relay 이벤트가 여기 표시됩니다.</small>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SETTINGS TAB ============ -->
+  <section id="screen-settings" class="screen hidden">
+    <div class="scroll-area">
+      <div class="screen-head">
+        <div class="screen-title"><h1><span class="ink">settings</span></h1></div>
+      </div>
+
+      <div class="card">
+        <div class="rule in-card"><span class="rule-title">tutorial</span></div>
+        <div class="guide">
+          <div class="guide-step"><span class="step-num">01</span><div><div class="step-title">Mac에서 cmux와 Tailscale을 켭니다.</div><div class="step-detail">같은 tailnet에 있어야 합니다.</div></div></div>
+          <div class="guide-step"><span class="step-num">02</span><div><div class="step-title">Mac 터미널에서 릴레이를 실행합니다.</div><div class="step-detail mono">swift run cmux-relay serve --config ~/.cmuxremote/relay.json</div></div></div>
+          <div class="guide-step"><span class="step-num">03</span><div><div class="step-title">relay.json의 listen을 열어둡니다.</div><div class="step-detail">실기기 연결은 0.0.0.0:80 또는 Tailscale IP 바인딩 필요.</div></div></div>
+          <div class="guide-step"><span class="step-num">04</span><div><div class="step-title">이 웹 페이지를 릴레이 주소로 엽니다.</div><div class="step-detail">host:port는 현재 연결된 릴레이입니다.</div></div></div>
+          <div class="guide-step"><span class="step-num">05</span><div><div class="step-title">Workspaces가 보이면 완료.</div><div class="step-detail">실패 시 Mac 릴레이/Tailscale 상태 확인.</div></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="rule in-card"><span class="rule-title">relay connection</span></div>
+        <div class="kv-row"><span class="kv-label">endpoint</span><span id="set-endpoint" class="kv-value mono"></span></div>
+        <div class="kv-row"><span class="kv-label">status</span><span id="set-status" class="kv-value mono">disconnected</span></div>
+        <div class="kv-row"><span class="kv-label">device id</span><span id="set-device" class="kv-value mono">—</span></div>
+        <button id="reconnect-btn" class="action-btn green-action">↻ [ RECONNECT ]</button>
+      </div>
+
+      <div class="card">
+        <div class="rule in-card"><span class="rule-title">host</span></div>
+        <div class="kv-row"><span class="kv-label">battery</span><span id="set-battery" class="kv-value mono">--</span></div>
+        <div class="kv-row"><span class="kv-label">state</span><span id="set-power" class="kv-value mono">--</span></div>
+        <button id="refresh-battery-btn" class="action-btn blue-action">↻ [ REFRESH BATTERY ]</button>
+      </div>
+
+      <div class="card">
+        <div class="rule in-card"><span class="rule-title">device</span></div>
+        <button id="unpair-btn" class="action-btn red-action danger-outline">✕ [ UNPAIR THIS DEVICE ]</button>
+        <small class="muted note">토큰과 기기 ID를 삭제하고 다시 등록합니다.</small>
+      </div>
+    </div>
+  </section>
+
+  <div id="banner" class="banner hidden"></div>
+
+  <!-- modal dialog (create/rename workspace, confirm close) -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-card">
+      <div id="modal-title" class="modal-title"></div>
+      <div id="modal-body" class="modal-body"></div>
+      <input id="modal-input" type="text" autocomplete="off" spellcheck="false" class="hidden">
+      <div class="modal-actions">
+        <button id="modal-cancel" class="modal-btn">Cancel</button>
+        <button id="modal-confirm" class="modal-btn primary">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- drawer overlay (pick any workspace/surface) -->
+  <div id="drawer" class="drawer hidden">
+    <div class="drawer-card">
+      <div class="drawer-head"><span class="rule-title">surfaces</span><button id="drawer-close" class="drawer-x">×</button></div>
+      <div id="drawer-list" class="drawer-list"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

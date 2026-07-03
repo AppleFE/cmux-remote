@@ -15,7 +15,7 @@ The following items are stored locally in the iOS Keychain or `UserDefaults` and
 | Item | Where | Purpose |
 |---|---|---|
 | Tailscale host name / IP | `UserDefaults` (`cmux.host`) | Address of your own relay |
-| Relay port | `UserDefaults` (`cmux.port`) | TCP port of your own relay (default `4399`) |
+| Relay port | `UserDefaults` (`cmux.port`) | TCP port of your own relay (default `80`) |
 | Bearer token | iOS Keychain (`com.genie.cmuxremote/bearer`) | Authenticates this iPhone to your relay |
 | Device identifier | iOS Keychain (`com.genie.cmuxremote/device_id`) | Identifies this iPhone to your relay |
 | Demo mode flag | `UserDefaults` (`cmux.demoMode`) | Whether App Review / first-run demo mode is on |

@@ -36,6 +36,7 @@ struct Serve: AsyncParsableCommand {
     var config: String = defaultConfigPath()
 
     func run() async throws {
+        acquireSingletonLock()
         let logger = Logger(label: "cmux-relay")
         let store = ConfigStore(url: URL(fileURLWithPath: config))
         try store.reload()
@@ -172,21 +173,59 @@ struct Devices: AsyncParsableCommand {
 }
 
 // MARK: - Path helpers
+/// Resolve the cmux-remote home directory. Honours the `HOME` environment
+/// variable first (so tests / launchd can pin it), falling back to the
+/// platform home. macOS's `NSHomeDirectory()` ignores `HOME` in some
+/// launch contexts, so we read the env explicitly.
+func cmuxRemoteHome() -> String {
+    ProcessInfo.processInfo.environment["HOME"] ?? NSHomeDirectory()
+}
 
 func defaultConfigPath() -> String {
-    "\(NSHomeDirectory())/.cmuxremote/relay.json"
+    "\(cmuxRemoteHome())/.cmuxremote/relay.json"
 }
 
 func devicesStorePath() -> String {
-    "\(NSHomeDirectory())/.cmuxremote/devices.json"
+    "\(cmuxRemoteHome())/.cmuxremote/devices.json"
 }
 
 /// Split `RelayConfig.listen` ("host:port") into a host + port pair.
-/// Falls back to 4399 if the port is missing or unparseable so a typo
+/// Falls back to 80 if the port is missing or unparseable so a typo
 /// in relay.json doesn't take the daemon down silently.
 func parseListen(_ listen: String) -> (host: String, port: Int) {
     let parts = listen.split(separator: ":", maxSplits: 1).map(String.init)
     let host = parts.first ?? "0.0.0.0"
-    let port = parts.count >= 2 ? (Int(parts[1]) ?? 4399) : 4399
+    let port = parts.count >= 2 ? (Int(parts[1]) ?? 80) : 80
     return (host, port)
+}
+
+// MARK: - Singleton guard
+
+/// Acquire an exclusive `flock` on `~/.cmuxremote/relay.lock`. If another
+/// cmux-relay already holds it, exit immediately with a non-zero status so
+/// launchd's `KeepAlive` doesn't end up running two daemons side-by-side —
+/// e.g. when the operator also runs `cmux-relay serve` manually while the
+/// launchd agent is registered, or when a stale `bootout` left the previous
+/// instance alive. The fd is intentionally never closed; the OS releases
+/// the lock when the process exits, so no cleanup is needed on crash.
+private func acquireSingletonLock() {
+    let dir = "\(cmuxRemoteHome())/.cmuxremote"
+    try? FileManager.default.createDirectory(
+        atPath: dir, withIntermediateDirectories: true)
+    let lockPath = "\(dir)/relay.lock"
+    let fd = open(lockPath, O_CREAT | O_RDWR, 0o644)
+    guard fd >= 0 else {
+        FileHandle.standardError.write(Data(
+            "cmux-relay: cannot open lock file \(lockPath): \(String(cString: strerror(errno)))\n".utf8))
+        exit(EXIT_FAILURE)
+    }
+    if flock(fd, LOCK_EX | LOCK_NB) != 0 {
+        FileHandle.standardError.write(Data(
+            "cmux-relay: another instance is already running (lock held on \(lockPath)); exiting.\n".utf8))
+        close(fd)
+        exit(EXIT_FAILURE)
+    }
+    // Record the PID for debugging — `ps`/`launchctl` can confirm ownership.
+    let pidStr = "\(ProcessInfo.processInfo.processIdentifier)\n"
+    _ = pidStr.withCString { write(fd, $0, pidStr.utf8.count) }
 }

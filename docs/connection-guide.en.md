@@ -37,14 +37,14 @@ swift --version      # Swift 5.10+ (Xcode 15.3+)
 ```bash
 git clone https://github.com/NewTurn2017/cmux-remote.git
 cd cmux-remote
-./scripts/install-launchd.sh
+sudo ./scripts/install-launchd.sh
 ```
 
 That one line:
 
-1. builds the relay in release mode (`~/.cmuxremote/bin/`),
+1. builds the relay in release mode (`/usr/local/lib/cmux-remote/bin/`),
 2. writes a default config if none exists (`~/.cmuxremote/relay.json`),
-3. registers it as a background service that auto-starts on login.
+3. registers it as a root background daemon that auto-starts at boot (binds port 80).
 
 Logs land in `~/.cmuxremote/log/`.
 
@@ -56,7 +56,7 @@ Logs land in `~/.cmuxremote/log/`.
 ## 2. Confirm the relay is up (on the Mac)
 
 ```bash
-curl -s http://$(tailscale ip -4):4399/v1/health
+curl -s http://$(tailscale ip -4):80/v1/health
 ```
 
 `{"ok":true,"version":"0.1.0"}` means the **relay is healthy**.
@@ -85,7 +85,7 @@ tailscale status     # if you'd rather use the MagicDNS name (e.g. my-mac)
 On the iPhone, open the cmux Remote app and:
 
 1. Tap **Add Mac**
-2. Enter the IP (or MagicDNS name) above, port **`4399`**
+2. Enter the IP (or MagicDNS name) above, port **`80`**
 3. **Approve** the pairing request that appears in the Mac's menu bar
 
 Once connected, the workspace list appears.
@@ -97,7 +97,7 @@ Once connected, the workspace list appears.
 Check these in order, one line at a time. **Most issues resolve at ① or ②.**
 
 ```bash
-SERVICE="gui/$(id -u)/com.genie.cmuxremote"
+SERVICE="system/com.genie.cmuxremote"
 ```
 
 ### ① Is cmux running?
@@ -107,18 +107,18 @@ If the cmux app is closed, the relay can't read the screen.
 ```bash
 cmux --version
 # After launching the cmux app:
-launchctl kickstart -k "$SERVICE"
+sudo launchctl kickstart -k "$SERVICE"
 ```
 
 ### ② Is the relay alive?
 
 ```bash
-curl -s http://$(tailscale ip -4):4399/v1/health
+curl -s http://$(tailscale ip -4):80/v1/health
 ```
 
-- No response → restart: `launchctl kickstart -k "$SERVICE"`
-- Still nothing → reinstall: `./scripts/install-launchd.sh`
-- Status: `launchctl print "$SERVICE" | grep -E "state|pid|last exit"`
+- No response → restart: `sudo launchctl kickstart -k "$SERVICE"`
+- Still nothing → reinstall: `sudo ./scripts/install-launchd.sh`
+- Status: `sudo launchctl print "$SERVICE" | grep -E "state|pid|last exit"`
 
 ### ③ Are the logs healthy?
 
@@ -129,7 +129,7 @@ tail -n 40 ~/.cmuxremote/log/stderr.log
 Healthy startup shows these three lines:
 
 ```
-starting cmux-relay on 0.0.0.0:4399
+starting cmux-relay on 0.0.0.0:80
 listening …
 cmux event stream attached
 ```
@@ -138,8 +138,8 @@ Depending on the log:
 
 | Log message | Meaning | Fix |
 |---|---|---|
-| `cmux event stream unavailable: socketMissing` | cmux is not running | Launch the cmux app, then `launchctl kickstart -k "$SERVICE"` |
-| Repeated `Connection refused` | cmux restarted and the socket name rotated | `launchctl kickstart -k "$SERVICE"`; if needed, re-run `./scripts/install-launchd.sh` |
+| `cmux event stream unavailable: socketMissing` | cmux is not running | Launch the cmux app, then `sudo launchctl kickstart -k "$SERVICE"` |
+| Repeated `Connection refused` | cmux restarted and the socket name rotated | `sudo launchctl kickstart -k "$SERVICE"`; if needed, re-run `sudo ./scripts/install-launchd.sh` |
 | Three lines OK but only the app can't attach | network/address issue | Check ④ and ⑤ |
 
 ### ④ Is Tailscale online on both ends?
@@ -157,7 +157,7 @@ tailscale status
 tailscale ip -4
 ```
 
-- Confirm the app uses this exact **IP** and port **`4399`**.
+- Confirm the app uses this exact **IP** and port **`80`**.
 - If you used a MagicDNS name, it must match `tailscale status` spelling.
 
 ### Still stuck?
@@ -165,9 +165,9 @@ tailscale ip -4
 A previously paired device token may have been revoked.
 
 ```bash
-.build/release/cmux-relay devices list     # see registered devices
+/usr/local/lib/cmux-remote/bin/cmux-relay devices list     # see registered devices
 # If needed, remove a device and re-pair from the app:
-# .build/release/cmux-relay devices revoke <device-id>
+# /usr/local/lib/cmux-remote/bin/cmux-relay devices revoke <device-id>
 ```
 
 ---
@@ -179,7 +179,7 @@ cmux can change its internal socket name on restart. The fastest way to
 re-attach the relay:
 
 ```bash
-launchctl kickstart -k "gui/$(id -u)/com.genie.cmuxremote"
+sudo launchctl kickstart -k "system/com.genie.cmuxremote"
 ```
 
 **Q. We're on the same Wi-Fi but it won't connect.**
@@ -207,14 +207,14 @@ Forward this verbatim to anyone reporting they can't connect:
 > 1. Make sure the cmux app is open.
 > 2. Paste into Terminal:
 >    ```bash
->    SERVICE="gui/$(id -u)/com.genie.cmuxremote"
->    launchctl kickstart -k "$SERVICE"
->    curl -s http://$(tailscale ip -4):4399/v1/health
+>    SERVICE="system/com.genie.cmuxremote"
+>    sudo launchctl kickstart -k "$SERVICE"
+>    curl -s http://$(tailscale ip -4):80/v1/health
 >    ```
 >    → `{"ok":true,...}` means the relay is healthy.
 > 3. Confirm the iPhone app and the Mac are signed into the **same
 >    Tailscale account**.
-> 4. In the app, enter the IP from `tailscale ip -4` and port `4399`.
+> 4. In the app, enter the IP from `tailscale ip -4` and port `80`.
 >
 > Still stuck? Send the output of
 > `tail -n 40 ~/.cmuxremote/log/stderr.log`.

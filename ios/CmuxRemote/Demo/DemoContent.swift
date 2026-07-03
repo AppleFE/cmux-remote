@@ -318,8 +318,8 @@ enum DemoContent {
     ]
 
     private static let relayLogSession: [String] = [
-        "[18:30:01] starting cmux-relay on :4399",
-        "[18:30:01] HTTPServer listening :4399",
+        "[18:30:01] starting cmux-relay on :80",
+        "[18:30:01] HTTPServer listening :80",
         "[18:30:06] cmux event stream attached",
         "[18:30:14] req GET /v1/ws 100.115.102.6",
         "[18:30:14] device registered: iphone",

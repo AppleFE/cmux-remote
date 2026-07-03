@@ -253,6 +253,13 @@ private final class HTTPHandler: ChannelInboundHandler, RemovableChannelHandler,
 
     private func respond(context: ChannelHandlerContext, resp: HTTPResponseLite) {
         var headers = HTTPHeaders()
+        for (name, value) in resp.headers {
+            let lower = name.lowercased()
+            // Content-Length / Connection are owned by this handler; ignore
+            // any caller-supplied value so they can't desync the wire.
+            guard lower != "content-length", lower != "connection" else { continue }
+            headers.add(name: name, value: value)
+        }
         headers.add(name: "Content-Length", value: "\(resp.body?.count ?? 0)")
         headers.add(name: "Connection", value: "close")
         let head = HTTPResponseHead(version: .http1_1,

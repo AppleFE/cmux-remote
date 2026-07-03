@@ -6,7 +6,7 @@ struct SettingsView: View {
     let onReconnect: () -> Void
     var onTriggerTestNotification: (@MainActor () -> TestNotificationResult)? = nil
     @AppStorage("cmux.host") private var host: String = ""
-    @AppStorage("cmux.port") private var port: Int = 4399
+    @AppStorage("cmux.port") private var port: Int = 80
     @AppStorage("cmux.demoMode") private var demoMode: Bool = false
     @State private var localStatus: TestNotificationStatus = .idle
     @State private var roundTripStatus: TestNotificationStatus = .idle
@@ -195,10 +195,10 @@ struct SettingsView: View {
                           detail: "swift run cmux-relay serve --config ~/.cmuxremote/relay.json")
                 GuideStep(number: 3,
                           title: "relay.json의 listen을 열어둡니다.",
-                          detail: "실기기 연결은 0.0.0.0:4399 또는 Tailscale IP 바인딩이 필요합니다.")
+                          detail: "실기기 연결은 0.0.0.0:80 또는 Tailscale IP 바인딩이 필요합니다.")
                 GuideStep(number: 4,
                           title: "아래 Mac 연결에 host와 port를 입력합니다.",
-                          detail: "host는 100.x Tailscale IP나 tailnet DNS, port는 보통 4399.")
+                          detail: "host는 100.x Tailscale IP나 tailnet DNS, port는 보통 80.")
                 GuideStep(number: 5,
                           title: "저장 후 연결 다시 시도를 누릅니다.",
                           detail: "Workspaces가 보이면 완료. 실패 시 Mac 릴레이/Tailscale 상태 확인.")

@@ -50,7 +50,7 @@ public struct RelayConfig: Codable, Equatable, Sendable {
     /// a real `apns` block is supplied; an empty `allow_login` authorises
     /// nobody until the operator lists their tailnet login.
     public static let defaults = RelayConfig(
-        listen: "0.0.0.0:4399",
+        listen: "0.0.0.0:80",
         allowLogin: [],
         apns: .init(keyPath: "", keyId: "", teamId: "", topic: "", env: "sandbox"),
         snippets: [],

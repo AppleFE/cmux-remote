@@ -103,7 +103,7 @@ struct CmuxRemoteApp: App {
             port = envPort
         } else {
             let defaultsPort = UserDefaults.standard.integer(forKey: "cmux.port")
-            port = defaultsPort == 0 ? 4399 : defaultsPort
+            port = defaultsPort == 0 ? 80 : defaultsPort
         }
         os_log("cmux bootstrap host=%{public}@ port=%{public}d", host, port)
         guard !host.isEmpty else { return }

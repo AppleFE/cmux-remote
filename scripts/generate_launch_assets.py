@@ -395,7 +395,7 @@ def screenshot_settings(mark_path: Path):
     d.text((x + 110, y + 315), "연결 튜토리얼", font=F["h2"], fill=INK)
     steps = [
         ("1", "Mac에서 cmux와 Tailscale을 켭니다."),
-        ("2", "릴레이를 실행하고 0.0.0.0:4399로 바인딩합니다."),
+        ("2", "릴레이를 실행하고 0.0.0.0:80으로 바인딩합니다."),
         ("3", "iPhone에서 Mac의 100.x IP와 포트를 입력합니다."),
         ("4", "저장 후 연결 다시 시도를 누릅니다."),
     ]
